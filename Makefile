@@ -28,7 +28,9 @@ OBJS = \
   $K/sysfile.o \
   $K/kernelvec.o \
   $K/plic.o \
-  $K/virtio_disk.o
+  $K/virtio_disk.o \
+  $K/crc32.o \
+  $K/crash.o
 
 # riscv64-unknown-elf- or riscv64-linux-gnu-
 # perhaps in /opt/riscv/bin
@@ -37,19 +39,19 @@ OBJS = \
 # Try to infer the correct TOOLPREFIX if not set
 ifndef TOOLPREFIX
 TOOLPREFIX := $(shell if riscv64-unknown-elf-objdump -i 2>&1 | grep 'elf64-big' >/dev/null 2>&1; \
-	then echo 'riscv64-unknown-elf-'; \
-	elif riscv64-elf-objdump -i 2>&1 | grep 'elf64-big' >/dev/null 2>&1; \
-	then echo 'riscv64-elf-'; \
-	elif riscv64-none-elf-objdump -i 2>&1 | grep 'elf64-big' >/dev/null 2>&1; \
-	then echo 'riscv64-none-elf-'; \
-	elif riscv64-linux-gnu-objdump -i 2>&1 | grep 'elf64-big' >/dev/null 2>&1; \
-	then echo 'riscv64-linux-gnu-'; \
-	elif riscv64-unknown-linux-gnu-objdump -i 2>&1 | grep 'elf64-big' >/dev/null 2>&1; \
-	then echo 'riscv64-unknown-linux-gnu-'; \
-	else echo "***" 1>&2; \
-	echo "*** Error: Couldn't find a riscv64 version of GCC/binutils." 1>&2; \
-	echo "*** To turn off this error, run 'gmake TOOLPREFIX= ...'." 1>&2; \
-	echo "***" 1>&2; exit 1; fi)
+    then echo 'riscv64-unknown-elf-'; \
+    elif riscv64-elf-objdump -i 2>&1 | grep 'elf64-big' >/dev/null 2>&1; \
+    then echo 'riscv64-elf-'; \
+    elif riscv64-none-elf-objdump -i 2>&1 | grep 'elf64-big' >/dev/null 2>&1; \
+    then echo 'riscv64-none-elf-'; \
+    elif riscv64-linux-gnu-objdump -i 2>&1 | grep 'elf64-big' >/dev/null 2>&1; \
+    then echo 'riscv64-linux-gnu-'; \
+    elif riscv64-unknown-linux-gnu-objdump -i 2>&1 | grep 'elf64-big' >/dev/null 2>&1; \
+    then echo 'riscv64-unknown-linux-gnu-'; \
+    else echo "***" 1>&2; \
+    echo "*** Error: Couldn't find a riscv64 version of GCC/binutils." 1>&2; \
+    echo "*** To turn off this error, run 'gmake TOOLPREFIX= ...'." 1>&2; \
+    echo "***" 1>&2; exit 1; fi)
 endif
 
 QEMU = qemu-system-riscv64
@@ -123,10 +125,12 @@ $U/_forktest: $U/forktest.o $(ULIB)
 mkfs/mkfs: mkfs/mkfs.c $K/fs.h $K/param.h
 	gcc -Wno-unknown-attributes -I. -o mkfs/mkfs mkfs/mkfs.c
 
-# Prevent deletion of intermediate files, e.g. cat.o, after first build, so
-# that disk image changes after first build are persistent until clean.  More
-# details:
-# http://www.gnu.org/software/make/manual/html_node/Chained-Rules.html
+fsck/fsck: fsck/fsck.c $K/fs.h $K/param.h $K/crc32.h
+	gcc -Werror -Wall -I. -o fsck/fsck fsck/fsck.c
+
+fsck/corrupt: fsck/corrupt.c $K/fs.h $K/param.h
+	gcc -Werror -Wall -I. -o fsck/corrupt fsck/corrupt.c
+
 .PRECIOUS: %.o
 
 UPROGS=\
@@ -146,10 +150,12 @@ UPROGS=\
 	$U/_grind\
 	$U/_wc\
 	$U/_zombie\
+	$U/_psinfo\
 	$U/_logstress\
 	$U/_forphan\
 	$U/_dorphan\
 	$U/_sync\
+	$U/_crashtest
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)
@@ -160,16 +166,25 @@ clean:
 	rm -f *.tex *.dvi *.idx *.aux *.log *.ind *.ilg \
 	*/*.o */*.d */*.asm */*.sym \
 	$K/kernel fs.img \
-	mkfs/mkfs .gdbinit \
-        $U/usys.S \
+	mkfs/mkfs fsck/fsck fsck/corrupt .gdbinit \
+	$U/usys.S \
 	$(UPROGS)
+
+check-fs: fsck/fsck fs.img
+	./fsck/fsck fs.img
+
+test-corrupt: fsck/fsck fsck/corrupt fs.img
+	bash scripts/test_corrupt.sh
+
+crash-test: kernel/kernel fs.img fsck/fsck
+	bash scripts/crash_loop.sh 200
 
 # try to generate a unique GDB port
 GDBPORT = $(shell expr `id -u` % 5000 + 25000)
 # QEMU's gdb stub command line changed in 0.11
 QEMUGDB = $(shell if $(QEMU) -help | grep -q '^-gdb'; \
-	then echo "-gdb tcp::$(GDBPORT)"; \
-	else echo "-s -p $(GDBPORT)"; fi)
+    then echo "-gdb tcp::$(GDBPORT)"; \
+    else echo "-s -p $(GDBPORT)"; fi)
 ifndef CPUS
 CPUS := 3
 endif
@@ -195,9 +210,9 @@ print-gdbport:
 QEMU_VERSION := $(shell $(QEMU) --version | head -n 1 | sed -E 's/^QEMU emulator version ([0-9]+\.[0-9]+)\..*/\1/')
 check-qemu-version:
 	@if [ "$(shell echo "$(QEMU_VERSION) >= $(MIN_QEMU_VERSION)" | bc)" -eq 0 ]; then \
-		echo "ERROR: Need qemu version >= $(MIN_QEMU_VERSION)"; \
-		exit 1; \
-	fi
+        echo "ERROR: Need qemu version >= $(MIN_QEMU_VERSION)"; \
+        exit 1; \
+    fi
 
 .PHONY: fmt
 fmt:
