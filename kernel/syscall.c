@@ -130,8 +130,8 @@ static uint64 (*syscalls[])(void) = {
   [SYS_mkdir]   = sys_mkdir,
   [SYS_close]   = sys_close,
   [SYS_sync]    = sys_sync,
-  [SYS_psinfo]  sys_psinfo, 
- // clang-format on
+  [SYS_psinfo]  sys_psinfo,
+  // clang-format on
 };
 
 void
@@ -150,4 +150,3 @@ syscall(void)
     p->trapframe->a0 = -1;
   }
 }
-	
