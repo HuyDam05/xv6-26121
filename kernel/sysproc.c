@@ -6,7 +6,8 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "vm.h"
-
+#include "defs.h"
+void printf(char*, ...);
 uint64
 sys_exit(void)
 {
@@ -109,4 +110,20 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+uint64
+sys_psinfo(void)
+{
+  char *mem = kalloc(); 
+  if(mem == 0){
+    printk("Loi: Khong the cap phat bo nho\n");
+    return -1;
+  }
+  printk("[Kernel] Cap phat 4096 bytes tai: %p\n", mem);
+
+  kfree((void *)mem);
+  printk("[Kernel] Thu hoi bo nho tai: %p\n", mem);
+
+  print_psinfo();
+  return 0;
 }
