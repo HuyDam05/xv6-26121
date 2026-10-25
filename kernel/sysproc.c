@@ -7,7 +7,7 @@
 #include "proc.h"
 #include "vm.h"
 #include "defs.h"
-void printf(char*, ...);
+void printf(char *, ...);
 uint64
 sys_exit(void)
 {
@@ -114,8 +114,8 @@ sys_uptime(void)
 uint64
 sys_psinfo(void)
 {
-  char *mem = kalloc(); 
-  if(mem == 0){
+  char *mem = kalloc();
+  if (mem == 0) {
     printk("Loi: Khong the cap phat bo nho\n");
     return -1;
   }

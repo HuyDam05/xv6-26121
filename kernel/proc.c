@@ -706,8 +706,8 @@ print_psinfo(void)
 {
   struct proc *p;
   printk("\n--- DANH SACH TIEN TRINH ---\n");
-  for(p = proc; p < &proc[NPROC]; p++){
-    if(p->state != UNUSED){
+  for (p = proc; p < &proc[NPROC]; p++) {
+    if (p->state != UNUSED) {
       printk("PID: %d | Trang thai: %d | Ten: %s\n", p->pid, p->state, p->name);
     }
   }
