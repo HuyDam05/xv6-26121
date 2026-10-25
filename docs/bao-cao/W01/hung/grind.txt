@@ -1,0 +1,1 @@
+grind CPUS=4 tren commit 06aad25 (upstream-base), chay khoang 2 phut, khong panic
