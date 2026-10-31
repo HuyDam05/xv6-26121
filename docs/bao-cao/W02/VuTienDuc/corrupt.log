@@ -1,0 +1,2 @@
+ERROR: block 0 is used but marked free in bitmap
+fsck: 1 error(s) found
