@@ -25,6 +25,9 @@
 #define VIRTIO0     0x10001000
 #define VIRTIO0_IRQ 1
 
+// qemu test device: ghi 0x5555 de thoat qemu (dung cho crash-injection)
+#define QEMU_TEST 0x100000L
+
 // core-local interrupt controller (CLINT)
 #define CLINT_BASE  0x02000000L
 #define CLINT(hart) (CLINT_BASE + (hart) * 4)
