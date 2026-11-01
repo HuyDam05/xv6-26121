@@ -21,6 +21,7 @@
 #include "defs.h"
 #include "fs.h"
 #include "buf.h"
+#include "crash.h"
 
 struct {
   struct spinlock lock;
@@ -108,6 +109,7 @@ bwrite(struct buf *b)
 {
   if (!holdingsleep(&b->lock))
     panic("bwrite");
+  crash_check(CRASH_DISK_WRITE);
   virtio_disk_rw(b, 1);
 }
 
