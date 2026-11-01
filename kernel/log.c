@@ -6,6 +6,7 @@
 #include "sleeplock.h"
 #include "fs.h"
 #include "buf.h"
+#include "crc32.h"
 
 // Simple logging that allows concurrent FS system calls.
 //
@@ -35,7 +36,11 @@
 struct logheader {
   int n;
   int block[LOGBLOCKS];
+  uint magic; // LOG_MAGIC: nhan biet header hop le
+  uint crc;   // CRC32 cua transaction (xem docs/crc-design.md)
 };
+
+#define LOG_MAGIC 0x4C4F4743 // chu "LOGC"
 
 struct log {
   struct spinlock lock;
@@ -92,6 +97,13 @@ read_head(void)
   struct logheader *lh = (struct logheader *)(buf->data);
   int i;
   log.lh.n = lh->n;
+  log.lh.magic = lh->magic;
+  log.lh.crc = lh->crc;
+  if (log.lh.n < 0 || log.lh.n > LOGBLOCKS) {
+    // header hong: khong doc block[] de tranh ghi ra ngoai mang
+    printk("log: bad header n=%d, dropping log\n", log.lh.n);
+    log.lh.n = 0;
+  }
   for (i = 0; i < log.lh.n; i++) {
     log.lh.block[i] = lh->block[i];
   }
@@ -111,16 +123,46 @@ write_head(void)
   for (i = 0; i < log.lh.n; i++) {
     hb->block[i] = log.lh.block[i];
   }
+  hb->magic = LOG_MAGIC;
+  hb->crc = log.lh.crc;
   bwrite(buf);
   brelse(buf);
+}
+
+// Tinh lai CRC tu header trong bo nho va cac log block tren dia,
+// theo dung thu tu da tinh trong write_log(). Tra ve 1 neu khop.
+static int
+log_crc_ok(void)
+{
+  uint32 crc;
+  int tail;
+
+  crc = crc32(0, &log.lh.n, sizeof(log.lh.n));
+  crc = crc32(crc, log.lh.block, sizeof(int) * log.lh.n);
+  for (tail = 0; tail < log.lh.n; tail++) {
+    struct buf *lbuf = bread(log.dev, log.start + tail + 1);
+    crc = crc32(crc, lbuf->data, BSIZE);
+    brelse(lbuf);
+  }
+  return crc == log.lh.crc;
 }
 
 static void
 recover_from_log(void)
 {
   read_head();
+  if (log.lh.n > 0) {
+    if (log.lh.magic != LOG_MAGIC) {
+      printk("log: bad magic, dropping log\n");
+      log.lh.n = 0;
+    } else if (!log_crc_ok()) {
+      printk("log: crc mismatch, dropping log\n");
+      log.lh.n = 0;
+    }
+  }
   install_trans(1); // if committed, copy from log to disk
   log.lh.n = 0;
+  log.lh.crc = 0;
   write_head(); // clear the log
 }
 
@@ -188,15 +230,22 @@ static void
 write_log(void)
 {
   int tail;
+  uint32 crc;
+
+  // CRC: n, danh sach block dich, roi noi dung tung log block.
+  crc = crc32(0, &log.lh.n, sizeof(log.lh.n));
+  crc = crc32(crc, log.lh.block, sizeof(int) * log.lh.n);
 
   for (tail = 0; tail < log.lh.n; tail++) {
     struct buf *to = bread(log.dev, log.start + tail + 1); // log block
     struct buf *from = bread(log.dev, log.lh.block[tail]); // cache block
     memmove(to->data, from->data, BSIZE);
+    crc = crc32(crc, to->data, BSIZE); // tinh tren ban da chep vao log block
     bwrite(to); // write the log
     brelse(from);
     brelse(to);
   }
+  log.lh.crc = crc;
 }
 
 static void
@@ -207,6 +256,7 @@ commit()
     write_head();     // Write header to disk -- the real commit
     install_trans(0); // Now install writes to home locations
     log.lh.n = 0;
+    log.lh.crc = 0;
     write_head(); // Erase the transaction from the log
   }
 }
