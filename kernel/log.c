@@ -241,7 +241,7 @@ write_log(void)
     struct buf *from = bread(log.dev, log.lh.block[tail]); // cache block
     memmove(to->data, from->data, BSIZE);
     crc = crc32(crc, to->data, BSIZE); // tinh tren ban da chep vao log block
-    bwrite(to); // write the log
+    bwrite(to);                        // write the log
     brelse(from);
     brelse(to);
   }
