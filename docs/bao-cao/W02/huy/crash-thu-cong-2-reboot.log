@@ -1,0 +1,38 @@
+Script started on 2026-11-01 14:58:24+07:00 [COMMAND="/home/DamQuangHuy_20233439/run-xv6.sh" TERM="xterm-256color" TTY="/dev/pts/0" COLUMNS="80" LINES="24"]
+
+xv6 kernel is booting
+
+hart 1 starting
+hart 2 starting
+init: starting sh
+$ ls
+.              1 1 1248
+..             1 1 1248
+README         2 2 2441
+cat            2 3 36808
+echo           2 4 35656
+forktest       2 5 17448
+grep           2 6 40248
+init           2 7 36112
+kill           2 8 35600
+ln             2 9 35392
+ls             2 10 38944
+mkdir          2 11 35640
+rm             2 12 35632
+sh             2 13 58664
+stressfs       2 14 36504
+usertests      2 15 202520
+grind          2 16 52064
+wc             2 17 37792
+zombie         2 18 34992
+psinfo         2 19 34872
+logstress      2 20 37576
+forphan        2 21 36400
+dorphan        2 22 35840
+sync           2 23 35056
+crashtest      2 24 35112
+console        3 25 0
+stopforking    2 26 0
+$ QEMU: Terminated
+
+Script done on 2026-11-01 14:58:34+07:00 [COMMAND_EXIT_CODE="0"]
