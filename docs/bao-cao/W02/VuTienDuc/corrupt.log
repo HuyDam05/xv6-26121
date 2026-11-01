@@ -1,2 +1,10 @@
+=== FSCK CORRUPTED BITMAP TEST ===
+Image: fs-corrupt.img
+Modification: bitmap block 46, first byte changed from 0xff to 0xfe
+Verification: xxd at offset 46*1024 shows fe
+
+Command: ./fsck/fsck -n fs-corrupt.img
+
 ERROR: block 0 is used but marked free in bitmap
 fsck: 1 error(s) found
+Exit code: 1

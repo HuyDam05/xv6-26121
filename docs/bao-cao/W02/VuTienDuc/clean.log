@@ -1,1 +1,5 @@
+=== FSCK CLEAN IMAGE TEST ===
+Command: ./fsck/fsck -n fs.img
+
 fsck: clean
+Exit code: 0
