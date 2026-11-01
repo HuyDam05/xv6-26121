@@ -133,11 +133,11 @@ main(int argc, char *argv[])
 
   // ---- đoạn thêm mới ----
   // /lost+found: thư mục rỗng, fsck -y sẽ đưa inode mồ côi vào đây.
-  lfino = ialloc(T_DIR);          // nlink = 1 (dirent "lost+found" trong thư mục gốc)
+  lfino = ialloc(T_DIR); // nlink = 1 (dirent "lost+found" trong thư mục gốc)
 
   bzero(&de, sizeof(de));
   de.inum = xshort(lfino);
-  strcpy(de.name, ".");           // "." không tính vào nlink (giống sys_mkdir)
+  strcpy(de.name, "."); // "." không tính vào nlink (giống sys_mkdir)
   iappend(lfino, &de, sizeof(de));
 
   bzero(&de, sizeof(de));
