@@ -73,7 +73,7 @@ int
 main(int argc, char *argv[])
 {
   int i, cc, fd;
-  uint rootino, inum, off;
+  uint rootino, lfino, inum, off;
   struct dirent de;
   char buf[BSIZE];
   struct dinode din;
@@ -130,6 +130,31 @@ main(int argc, char *argv[])
   de.inum = xshort(rootino);
   strcpy(de.name, "..");
   iappend(rootino, &de, sizeof(de));
+
+  // ---- đoạn thêm mới ----
+  // /lost+found: thư mục rỗng, fsck -y sẽ đưa inode mồ côi vào đây.
+  lfino = ialloc(T_DIR); // nlink = 1 (dirent "lost+found" trong thư mục gốc)
+
+  bzero(&de, sizeof(de));
+  de.inum = xshort(lfino);
+  strcpy(de.name, "."); // "." không tính vào nlink (giống sys_mkdir)
+  iappend(lfino, &de, sizeof(de));
+
+  bzero(&de, sizeof(de));
+  de.inum = xshort(rootino);
+  strcpy(de.name, "..");
+  iappend(lfino, &de, sizeof(de));
+
+  bzero(&de, sizeof(de));
+  de.inum = xshort(lfino);
+  strcpy(de.name, "lost+found");
+  iappend(rootino, &de, sizeof(de));
+
+  // ".." của lost+found trỏ về thư mục gốc nên nlink của gốc tăng 1
+  rinode(rootino, &din);
+  din.nlink = xshort(xshort(din.nlink) + 1);
+  winode(rootino, &din);
+  // ---- hết đoạn thêm mới ----
 
   for (i = 2; i < argc; i++) {
     // get rid of "user/"
