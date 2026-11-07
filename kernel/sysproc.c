@@ -7,6 +7,7 @@
 #include "proc.h"
 #include "vm.h"
 #include "defs.h"
+#include "crash.h"
 void printf(char *, ...);
 uint64
 sys_exit(void)
@@ -125,5 +126,20 @@ sys_psinfo(void)
   printk("[Kernel] Thu hoi bo nho tai: %p\n", mem);
 
   print_psinfo();
+  return 0;
+}
+
+// crash_ctl(point, count): dat diem crash cho lan chay hien tai cua kernel.
+// point = 0 hoac count = 0 la tat. Tham so sai tra ve -1, khong crash.
+uint64
+sys_crash_ctl(void)
+{
+  int point, count;
+
+  argint(0, &point);
+  argint(1, &count);
+  if (point < CRASH_NONE || point > CRASH_MAXPOINT || count < 0)
+    return -1;
+  crash_set(point, count);
   return 0;
 }
