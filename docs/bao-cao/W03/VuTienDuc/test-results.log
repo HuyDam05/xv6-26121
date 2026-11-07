@@ -48,3 +48,18 @@ WARNING: inode 2 has nlink=0 and is unreachable (possibly pending reclamation)
 fsck: clean
 Exit code: 0
 
+
+===== READ-ONLY SHA256 VERIFICATION =====
+Image: fs.img
+SHA256 before: d60f49a6e505507e8324f8615870cdae8bc0e1908f6747d04fc2c5e9005870d6
+SHA256 after:  d60f49a6e505507e8324f8615870cdae8bc0e1908f6747d04fc2c5e9005870d6
+Unchanged: YES
+FSCK exit code: 0
+
+Image: fs-orphan-corrupt.img
+SHA256 before: 75134f4905bff69d2dfa43c7e06797fc803479b19ee0643999c5a10ed3481665
+SHA256 after:  75134f4905bff69d2dfa43c7e06797fc803479b19ee0643999c5a10ed3481665
+Unchanged: YES
+FSCK exit code: 1
+
+Result: PASS - both images unchanged

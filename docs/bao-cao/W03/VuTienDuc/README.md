@@ -199,6 +199,28 @@ Hai ảnh đĩa được kiểm thử không thay đổi sau khi chương trình
 
 ---
 
+
+### 4.5. Cách chạy lại kiểm thử
+
+Biên dịch chương trình:
+
+    make fsck/fsck
+
+Kiểm tra ảnh đĩa bình thường:
+
+    ./fsck/fsck -n fs.img
+    echo $?
+
+Kiểm tra ảnh đĩa lỗi đã chuẩn bị:
+
+    ./fsck/fsck -n fs-orphan-corrupt.img
+    echo $?
+
+Kiểm tra checksum trước và sau bằng `sha256sum` để xác nhận
+chế độ `-n` không ghi thay đổi vào ảnh đĩa.
+
+Kết quả kiểm thử được lưu trong `test-results.log`.
+
 ## 5. Thiết kế chế độ sửa lỗi fsck -y
 
 Trong Tuần 3, đã xây dựng bản đề xuất cho chế độ sửa chữa tự động.
