@@ -184,6 +184,366 @@ check_bitmap(struct superblock *sb)
   }
 }
 
+
+/* Read an inode from the disk image. */
+static void
+read_disk_inode(struct superblock *sb, uint inum,
+                struct dinode *out)
+{
+  uchar buf[BSIZE];
+
+  rblock(IBLOCK(inum, (*sb)), buf);
+  memcpy(out, buf + (inum % IPB) * sizeof(*out),
+         sizeof(*out));
+}
+
+/* Read one directory entry, including indirect blocks. */
+static int
+read_directory_entry(struct superblock *sb,
+                     struct dinode *dir,
+                     uint offset, struct dirent *entry)
+{
+  uchar buf[BSIZE];
+  uint index = offset / BSIZE;
+  uint blockno;
+  uint datastart =
+    sb->bmapstart + (sb->size + BPB - 1) / BPB;
+
+  if(index < NDIRECT){
+    blockno = dir->addrs[index];
+  } else {
+    index -= NDIRECT;
+    uint indirect = dir->addrs[NDIRECT];
+
+    if(index >= NINDIRECT ||
+       indirect < datastart || indirect >= sb->size)
+      return -1;
+
+    rblock(indirect, buf);
+    memcpy(&blockno, buf + index * sizeof(uint),
+           sizeof(blockno));
+  }
+
+  if(blockno < datastart || blockno >= sb->size ||
+     offset % BSIZE + sizeof(*entry) > BSIZE)
+    return -1;
+
+  rblock(blockno, buf);
+  memcpy(entry, buf + offset % BSIZE, sizeof(*entry));
+
+  return 0;
+}
+
+/* Count actual directory links and compare with nlink. */
+static void
+check_nlink(struct superblock *sb)
+{
+  uint *links = calloc(sb->ninodes, sizeof(uint));
+
+  if(links == NULL){
+    fprintf(stderr, "fsck: out of memory\n");
+    exit(2);
+  }
+
+  for(uint inum = 1; inum < sb->ninodes; inum++){
+    struct dinode dir;
+    read_disk_inode(sb, inum, &dir);
+
+    if(dir.type != 1)
+      continue;
+
+    if(dir.size > MAXFILE * BSIZE ||
+       dir.size % sizeof(struct dirent) != 0){
+      report("directory inode %u has invalid size", inum);
+      continue;
+    }
+
+    for(uint off = 0; off < dir.size;
+        off += sizeof(struct dirent)){
+      struct dirent de;
+
+      if(read_directory_entry(sb, &dir, off, &de) != 0){
+        report("cannot read directory inode %u", inum);
+        break;
+      }
+
+      if(de.inum == 0)
+        continue;
+
+      /* "." does not contribute to nlink. */
+      if(de.name[0] == '.' && de.name[1] == '\0')
+        continue;
+
+      /* ".." contributes to its parent nlink. */
+      if(de.inum >= sb->ninodes){
+        report("directory %u has invalid inode %u",
+               inum, de.inum);
+        continue;
+      }
+
+      struct dinode target;
+      read_disk_inode(sb, de.inum, &target);
+
+      if(target.type == 0){
+        report("directory %u references free inode %u",
+               inum, de.inum);
+        continue;
+      }
+
+      links[de.inum]++;
+    }
+  }
+
+  for(uint inum = 1; inum < sb->ninodes; inum++){
+    struct dinode dip;
+    read_disk_inode(sb, inum, &dip);
+
+    if(dip.type == 0)
+      continue;
+
+    if(dip.nlink != (int)links[inum]){
+      report("inode %u nlink mismatch (disk=%d, expected=%u)",
+             inum, dip.nlink, links[inum]);
+    }
+  }
+
+  free(links);
+}
+
+
+static void
+check_directories(struct superblock *sb)
+{
+  uint *parent = calloc(sb->ninodes, sizeof(uint));
+  uint *dotdot = calloc(sb->ninodes, sizeof(uint));
+  uint *dots = calloc(sb->ninodes, sizeof(uint));
+  uint *dotdots = calloc(sb->ninodes, sizeof(uint));
+
+  if(!parent || !dotdot || !dots || !dotdots){
+    fprintf(stderr, "fsck: out of memory\n");
+    exit(2);
+  }
+
+  for(uint inum = 1; inum < sb->ninodes; inum++){
+    struct dinode dir;
+    read_disk_inode(sb, inum, &dir);
+
+    if(dir.type != 1)
+      continue;
+
+    if(dir.size > MAXFILE * BSIZE ||
+       dir.size % sizeof(struct dirent) != 0){
+      report("directory %u has invalid size", inum);
+      continue;
+    }
+
+    for(uint off = 0; off < dir.size;
+        off += sizeof(struct dirent)){
+      struct dirent de;
+
+      if(read_directory_entry(sb, &dir, off, &de) != 0){
+        report("directory %u has unreadable entry", inum);
+        break;
+      }
+
+      if(de.inum == 0)
+        continue;
+
+      if(de.inum >= sb->ninodes){
+        report("directory %u has invalid dirent inode %u",
+               inum, de.inum);
+        continue;
+      }
+
+      struct dinode target;
+      read_disk_inode(sb, de.inum, &target);
+
+      if(target.type == 0){
+        report("directory %u references free inode %u",
+               inum, de.inum);
+        continue;
+      }
+
+      if(de.name[0] == '.' && de.name[1] == '\0'){
+        dots[inum]++;
+        if(de.inum != inum)
+          report("directory %u has invalid dot entry", inum);
+        continue;
+      }
+
+      if(de.name[0] == '.' &&
+         de.name[1] == '.' && de.name[2] == '\0'){
+        dotdots[inum]++;
+        dotdot[inum] = de.inum;
+
+        if(target.type != 1)
+          report("directory %u has non-directory parent", inum);
+        continue;
+      }
+
+      if(de.name[0] == '\0')
+        report("directory %u has empty entry name", inum);
+
+      if(target.type == 1){
+        if(de.inum == ROOTINO)
+          report("root directory has invalid parent link");
+
+        if(parent[de.inum] != 0)
+          report("directory inode %u has multiple parent links",
+                 de.inum);
+        else
+          parent[de.inum] = inum;
+      }
+    }
+  }
+
+  for(uint inum = 1; inum < sb->ninodes; inum++){
+    struct dinode dir;
+    read_disk_inode(sb, inum, &dir);
+
+    if(dir.type != 1)
+      continue;
+
+    if(dots[inum] != 1)
+      report("directory %u has %u dot entries",
+             inum, dots[inum]);
+
+    if(dotdots[inum] != 1)
+      report("directory %u has %u dotdot entries",
+             inum, dotdots[inum]);
+
+    if(inum == ROOTINO){
+      if(dotdot[inum] != ROOTINO)
+        report("root directory has invalid dotdot");
+    } else if(parent[inum] != 0 &&
+              dotdot[inum] != parent[inum]){
+      report("directory %u has incorrect dotdot parent",
+             inum);
+    }
+
+    uint cur = inum;
+    for(uint steps = 0; steps < sb->ninodes; steps++){
+      if(parent[cur] == 0)
+        break;
+
+      cur = parent[cur];
+
+      if(cur == inum){
+        report("directory cycle detected at inode %u", inum);
+        break;
+      }
+
+      if(steps == sb->ninodes - 1)
+        report("directory parent chain cycle at inode %u",
+               inum);
+    }
+  }
+
+  free(parent);
+  free(dotdot);
+  free(dots);
+  free(dotdots);
+}
+
+
+/*
+ * D3: Find inodes unreachable from the root directory.
+ * An unreferenced inode with nlink == 0 may be pending
+ * reclamation after a crash.
+ */
+static void
+check_orphans(struct superblock *sb)
+{
+  uchar *reachable = calloc(sb->ninodes, sizeof(uchar));
+  uint *queue = calloc(sb->ninodes, sizeof(uint));
+  uint head = 0, tail = 0;
+
+  if(reachable == NULL || queue == NULL){
+    fprintf(stderr, "fsck: out of memory\n");
+    free(reachable);
+    free(queue);
+    exit(2);
+  }
+
+  struct dinode root;
+  read_disk_inode(sb, ROOTINO, &root);
+
+  if(root.type != 1){
+    report("root inode is not a directory");
+    free(reachable);
+    free(queue);
+    return;
+  }
+
+  reachable[ROOTINO] = 1;
+  queue[tail++] = ROOTINO;
+
+  while(head < tail){
+    uint inum = queue[head++];
+    struct dinode dir;
+    read_disk_inode(sb, inum, &dir);
+
+    if(dir.type != 1)
+      continue;
+
+    if(dir.size > MAXFILE * BSIZE ||
+       dir.size % sizeof(struct dirent) != 0)
+      continue;
+
+    for(uint off = 0; off < dir.size;
+        off += sizeof(struct dirent)){
+      struct dirent de;
+
+      if(read_directory_entry(sb, &dir, off, &de) != 0)
+        break;
+
+      if(de.inum == 0 || de.inum >= sb->ninodes)
+        continue;
+
+      if(de.name[0] == '.' && de.name[1] == '\0')
+        continue;
+
+      if(de.name[0] == '.' &&
+         de.name[1] == '.' && de.name[2] == '\0')
+        continue;
+
+      struct dinode target;
+      read_disk_inode(sb, de.inum, &target);
+
+      if(target.type == 0 || reachable[de.inum])
+        continue;
+
+      reachable[de.inum] = 1;
+
+      if(target.type == 1)
+        queue[tail++] = de.inum;
+    }
+  }
+
+  for(uint inum = 1; inum < sb->ninodes; inum++){
+    struct dinode dip;
+    read_disk_inode(sb, inum, &dip);
+
+    if(dip.type == 0 || reachable[inum])
+      continue;
+
+    if(dip.nlink > 0){
+      report("orphan inode %u: nlink=%d, unreachable from root",
+             inum, dip.nlink);
+    } else if(dip.nlink == 0){
+      printf("WARNING: inode %u has nlink=0 and is "
+             "unreachable (possibly pending reclamation)\n",
+             inum);
+    } else {
+      report("inode %u has negative nlink %d",
+             inum, dip.nlink);
+    }
+  }
+
+  free(reachable);
+  free(queue);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -237,6 +597,12 @@ main(int argc, char *argv[])
 
   if(nerrors == 0)
     check_bitmap(&sb);
+
+  if(nerrors == 0){
+    check_nlink(&sb);
+    check_directories(&sb);
+    check_orphans(&sb);
+  }
 
   if(nerrors > 0){
     printf("fsck: %d error(s) found\n", nerrors);
