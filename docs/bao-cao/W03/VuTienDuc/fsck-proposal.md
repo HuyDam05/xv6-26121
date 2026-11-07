@@ -16,10 +16,12 @@ Xây dựng công cụ fsck chạy trên host Ubuntu, đọc trực tiếp ảnh
 
 ### 3. Cấu trúc dữ liệu
 
-- used_blocks[]: đánh dấu block đang được sử dụng.
-- link_count[]: đếm liên kết thực tế tới inode.
-- inode_reachable[]: xác định inode có thể truy cập từ thư mục gốc.
-- visited_dirs[]: phát hiện vòng lặp thư mục.
+- `used_blocks[]`: đánh dấu các block đang được sử dụng để kiểm tra block trùng và bitmap.
+- `links[]`: đếm số liên kết thực tế tới từng inode để đối chiếu với `dinode.nlink`.
+- `reachable[]`: đánh dấu các inode có thể truy cập từ thư mục gốc trong quá trình BFS.
+- `queue[]`: hàng đợi dùng để duyệt BFS khi phát hiện inode mồ côi.
+- `parent[]`: lưu quan hệ cha của thư mục và hỗ trợ phát hiện vòng lặp.
+- `dotdot[]`, `dots[]`, `dotdots[]`: kiểm tra tính hợp lệ và số lượng entry `.` và `..`.
 
 ### 4. Chế độ hoạt động
 
@@ -45,10 +47,11 @@ Cần phân biệt inode có nlink = 0 đang chờ thu hồi sau crash với ino
 
 ### 6. Các file liên quan
 
-- fsck/fsck.c: chương trình kiểm tra filesystem.
-- fsck/corrupt.c: công cụ tạo ảnh đĩa lỗi do Huy phụ trách.
-- scripts/run_tests.sh: kiểm thử tự động.
-- kernel/fs.h: định nghĩa cấu trúc filesystem.
-- mkfs/mkfs.c: khởi tạo fs.img và /lost+found.
+- `fsck/fsck.c`: chương trình kiểm tra filesystem trên host Ubuntu.
+- `fsck/corrupt.c`: khung công cụ hỗ trợ tạo ảnh đĩa lỗi; hiện chưa tự động thực hiện đầy đủ các chế độ corrupt.
+- `kernel/fs.h`: định nghĩa các cấu trúc dữ liệu và hằng số của filesystem xv6.
+- `mkfs/mkfs.c`: chương trình tạo `fs.img`, bao gồm phần khởi tạo `/lost+found`.
+- `docs/bao-cao/W03/VuTienDuc/README.md`: báo cáo triển khai và kết quả Tuần 3.
+- `docs/bao-cao/W03/VuTienDuc/test-results.log`: log kiểm thử và minh chứng SHA-256.
 
-Phần này sẽ được tích hợp vào docs/proposal.md của nhóm.
+Phần thiết kế này có thể được dùng làm cơ sở để tích hợp vào tài liệu thiết kế chung của nhóm.
