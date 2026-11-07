@@ -1,0 +1,50 @@
+===== W03 FSCK TEST EVIDENCE =====
+Author: VuTienDuc
+
+===== TEST: fs.img =====
+fsck: clean
+Exit code: 0
+
+===== TEST: fs-nlink-corrupt.img =====
+ERROR: inode 1 nlink mismatch (disk=2, expected=1)
+fsck: 1 error(s) found
+Exit code: 1
+
+===== TEST: fs-dir-corrupt.img =====
+ERROR: directory 1 has invalid dot entry
+fsck: 1 error(s) found
+Exit code: 1
+
+===== TEST: fs-dotdot-corrupt.img =====
+ERROR: inode 1 nlink mismatch (disk=1, expected=0)
+ERROR: inode 2 nlink mismatch (disk=1, expected=2)
+ERROR: directory 1 has non-directory parent
+ERROR: root directory has invalid dotdot
+fsck: 4 error(s) found
+Exit code: 1
+
+===== TEST: fs-dirent-corrupt.img =====
+ERROR: directory 1 has invalid dirent inode 999
+ERROR: directory 1 has 0 dot entries
+fsck: 2 error(s) found
+Exit code: 1
+
+===== TEST: fs-cycle-corrupt.img =====
+ERROR: inode 1 nlink mismatch (disk=1, expected=3)
+ERROR: root directory has invalid parent link
+ERROR: directory cycle detected at inode 1
+ERROR: directory cycle detected at inode 2
+fsck: 4 error(s) found
+Exit code: 1
+
+===== TEST: fs-orphan-corrupt.img =====
+ERROR: inode 2 nlink mismatch (disk=1, expected=0)
+ERROR: orphan inode 2: nlink=1, unreachable from root
+fsck: 2 error(s) found
+Exit code: 1
+
+===== TEST: fs-nlink-zero.img =====
+WARNING: inode 2 has nlink=0 and is unreachable (possibly pending reclamation)
+fsck: clean
+Exit code: 0
+
