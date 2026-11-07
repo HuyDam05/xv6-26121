@@ -11,7 +11,7 @@
 | `magic` | 4 B | `LOG_MAGIC = 0x4C4F4743` ("LOGC"), nhận biết header hợp lệ |
 | `crc` | 4 B | CRC32 của transaction |
 
-Tổng 132 B, nhỏ hơn `BSIZE` = 1024 B (`initlog` gọi `panic` nếu không thỏa). CRC dùng đa thức 0xEDB88320 và được kiểm thử trên host (PR #11). CRC tính trên: `n`, danh sách `block[0..n-1]` và nội dung `n` block log trên đĩa. *(xác nhận lại với `log_crc_ok`)*
+Tổng 132 B, nhỏ hơn `BSIZE` = 1024 B (`initlog` gọi `panic` nếu không thỏa). CRC dùng đa thức 0xEDB88320 và được kiểm thử trên host (PR #11). CRC tính trên header (`n` và danh sách `block[]`) cùng nội dung `n` block log trên đĩa. Nội dung log block nằm trong phạm vi CRC đã được kiểm chứng ở mục 2.5.
 
 ### 2.2 Thứ tự commit và 5 điểm crash
 
@@ -45,7 +45,9 @@ Sau mọi trường hợp, kernel ghi lại header với `n = 0`, `crc = 0`.
 
 Số syscall 23. `point` hợp lệ trong khoảng 0 đến `CRASH_MAXPOINT` (= 5), ngoài khoảng đó trả lỗi `invalid argument` và không crash. `count` là lần gọi thứ N của đúng điểm đó. Chương trình `crashtest <point> <count>` đặt điểm crash rồi để workload chạy tiếp.
 
-### 2.5 Kết quả thực nghiệm (QEMU, `crashtest <điểm> 1`)
+### 2.5 Kết quả thực nghiệm
+
+**Crash tại từng điểm** (QEMU, `crashtest <điểm> 1`, sau đó boot lại trên cùng `fs.img`):
 
 | Điểm | Khi boot lại | File tạo dở (`ct0`) | `fsck -n` |
 |---|---|---|---|
@@ -56,10 +58,14 @@ Số syscall 23. `point` hợp lệ trong khoảng 0 đến `CRASH_MAXPOINT` (= 
 
 Crash trước commit point thì transaction biến mất hoàn toàn, sau commit point thì được replay đủ. Ở điểm 3 và 5, block đã install bị ghi lại lần hai mà dữ liệu vẫn đúng, nên replay là idempotent.
 
+**Test log hỏng (H3):** lấy ảnh đĩa sau điểm 2 (log đã commit, `n = 3`), đảo toàn bộ bit của 1 byte trong log block 0, giữ nguyên header. Boot lại in `log: crc mismatch, dropping log`, không có `recovering tail` nào, file `ct0` không xuất hiện, `fsck -n` báo clean. CRC phát hiện được lỗi trong nội dung log block dù header hợp lệ.
+
 ### 2.6 File sẽ sửa
 
 `kernel/log.c`, `kernel/crc32.c/.h`, `kernel/crash.c/.h`, `kernel/bio.c`, `kernel/syscall.h/.c`, `kernel/sysproc.c`, `user/usys.pl`, `user/user.h`, `user/crashtest.c`.
 
-### 2.7 Việc còn lại (tuần 4)
+### 2.7 Trạng thái và việc còn lại
 
-Test CRC bắt log hỏng: làm hỏng 1 byte ở log block của ảnh đĩa sau điểm 2, kernel phải in `crc mismatch, dropping log` và `fsck` vẫn clean.
+Đã hoàn thành: 5 điểm crash và syscall `crash_ctl`; kiểm chứng recovery tại các điểm 1, 2, 3, 5; kiểm chứng CRC bắt log hỏng (nhánh CRC lệch của bảng 2.3).
+
+Tuần 4: kiểm chứng hai nhánh còn lại của bảng 2.3 (magic sai, `n` hỏng); tự động hóa các ca log hỏng trong `make test` khi công cụ `corrupt` có các mode `log-*`; chạy lặp 200+ lần crash có seed trước và sau CRC để so sánh.
