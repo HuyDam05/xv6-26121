@@ -22,3 +22,4 @@
 #define SYS_close  21
 #define SYS_sync   22
 #define SYS_psinfo 22
+#define SYS_crash_ctl 23

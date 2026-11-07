@@ -7,6 +7,7 @@
 #include "fs.h"
 #include "buf.h"
 #include "crc32.h"
+#include "crash.h"
 
 // Simple logging that allows concurrent FS system calls.
 //
@@ -86,6 +87,10 @@ install_trans(int recovering)
       bunpin(dbuf);
     brelse(lbuf);
     brelse(dbuf);
+    // Diem crash 3: da chep xong mot block ve vi tri that, con block khac.
+    // Khong goi luc recovery de kernel khoi dong lai khong tu crash.
+    if (recovering == 0)
+      crash_check(CRASH_INSTALL_MID);
   }
 }
 
@@ -252,9 +257,15 @@ static void
 commit()
 {
   if (log.lh.n > 0) {
-    write_log();      // Write modified blocks from cache to log
-    write_head();     // Write header to disk -- the real commit
+    write_log(); // Write modified blocks from cache to log
+    // Diem crash 1: log block da xuong dia, header chua ghi (chua commit).
+    crash_check(CRASH_COMMIT_BEFORE_HDR);
+    write_head(); // Write header to disk -- the real commit
+    // Diem crash 2: header da xuong dia (da commit), chua install.
+    crash_check(CRASH_COMMIT_AFTER_HDR);
     install_trans(0); // Now install writes to home locations
+    // Diem crash 5: da install xong, header van n > 0 (chua xoa log).
+    crash_check(CRASH_INSTALL_DONE);
     log.lh.n = 0;
     log.lh.crc = 0;
     write_head(); // Erase the transaction from the log
