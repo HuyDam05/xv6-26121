@@ -193,9 +193,12 @@ Sử dụng SHA-256 để so sánh checksum của hai ảnh đĩa trước và s
 
 Kết quả:
 
-    Diff exit code: 0
+SHA-256 trước và sau khi chạy `fsck -n` giống nhau trên cả hai ảnh đĩa được kiểm thử:
 
-Hai ảnh đĩa được kiểm thử không thay đổi sau khi chương trình chạy.
+- `fs.img`
+- `fs-orphan-corrupt.img`
+
+Điều này xác nhận chế độ `-n` không ghi thay đổi vào các ảnh đĩa được kiểm thử.
 
 ---
 
@@ -259,9 +262,7 @@ Các file liên quan:
 Thông tin Git:
 
 - Repository: `HuyDam05/xv6-26121`
-- Branch: `feat/duc-w03-fsck`
-- Commit: `055cbe3`
+- Nhánh phát triển: `feat/duc-w03-fsck`
+- Commit triển khai chính: `055cbe3`
 - Tác giả: `VuTienDuc`
-- Đã push nhánh lên GitHub.
-
----
+- Các thay đổi mã nguồn, báo cáo và minh chứng Tuần 3 đã được tích hợp vào `main`.
