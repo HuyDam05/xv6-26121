@@ -1,83 +1,126 @@
 #!/usr/bin/env bash
-# crash_loop.sh - chay xv6, crash o diem ngau nhien (theo seed), boot lai cung fs.img, chay fsck, ghi CSV.
-# Cach dung (chay tu thu muc goc repo):
-#   bash scripts/crash_loop.sh [RUNS]
-# Bien moi truong tuy chon:
-#   RUNS=10  SEED_BASE=1  CPUS=1  POINT=4  NMAX=3000  WORKLOAD="usertests -q"  TIMEOUT=120
-# Tai lap mot lan chay: RUNS=1 SEED_BASE=<seed> bash scripts/crash_loop.sh
-set -u
+# xv6-26121 / Huy W03: crash -> reboot -> fsck, using crash_ctl.
+set -euo pipefail
 
-RUNS=${1:-${RUNS:-10}}
-SEED_BASE=${SEED_BASE:-1}
-CPUS=${CPUS:-1}
-POINT=${POINT:-4}            # 4 = CRASH_DISK_WRITE (xem kernel/crash.h)
-NMAX=${NMAX:-3000}           # crash o lan ghi block thu N, N chon ngau nhien trong [1, NMAX]
-WORKLOAD=${WORKLOAD:-"usertests -q"}
-TIMEOUT=${TIMEOUT:-120}
-REBOOT_SECS=${REBOOT_SECS:-8}
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
 
-WORK=results/work
-CSV=results/crash_runs.csv
-mkdir -p "$WORK/logs" results
+RUNS="${1:-10}"
+SEED_BASE="${SEED_BASE:-101}"
+CPUS="${CPUS:-1}"
+BOOT_DELAY="${BOOT_DELAY:-3}"
+CRASH_TIMEOUT="${CRASH_TIMEOUT:-45}"
+REBOOT_TIMEOUT="${REBOOT_TIMEOUT:-9}"
+WORK="results/work-v2"
+CSV="results/crash_runs_after_crc.csv"
 
-for tool in qemu-system-riscv64 make; do
-  command -v "$tool" >/dev/null || { echo "thieu $tool"; exit 1; }
+for name in RUNS SEED_BASE CPUS; do
+  value="${!name}"
+  if ! [[ "$value" =~ ^[1-9][0-9]*$ ]]; then
+    echo "ERROR: $name must be a positive integer" >&2
+    exit 2
+  fi
 done
 
-qemu_run() { # $1=kernel $2=image $3=giay toi da $4=lenh nhap vao xv6 $5=file log
-  timeout "$3" qemu-system-riscv64 -machine virt -bios none -kernel "$1" -m 128M \
-    -smp "$CPUS" -nographic -global virtio-mmio.force-legacy=false \
-    -drive file="$2",if=none,format=raw,id=x0 \
-    -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 \
-    < <(exec 2>/dev/null; sleep 2; printf '%s\n' "$4"; sleep "$3") > "$5" 2>&1
-}
+for tool in qemu-system-riscv64 timeout make; do
+  command -v "$tool" >/dev/null || {
+    echo "Missing: $tool" >&2
+    exit 2
+  }
+done
 
-echo "[crash_loop] build ban kernel sach (khong crash) va fs.img goc"
-touch kernel/crash.c
-make -s kernel/kernel fs.img fsck/fsck >/dev/null 2>&1 || { echo "build loi"; exit 1; }
-cp kernel/kernel "$WORK/kernel-clean"
+mkdir -p "$WORK/logs" results
+make -s kernel/kernel fs.img fsck/fsck
+
+if ! ./fsck/fsck -n fs.img | grep -Fq 'fsck: clean'; then
+  echo 'ERROR: original fs.img is not clean' >&2
+  exit 2
+fi
+
 cp fs.img "$WORK/fs.base.img"
 
-[ -f "$CSV" ] || echo "run,seed,cpus,point,n,crashed,reboot_ok,recovering_lines,crc_msgs,panic,fsck_exit,fsck_last_line" > "$CSV"
+printf '%s\n' \
+'run,seed,cpus,point,n,crashed,reboot_ok,recovering_lines,crc_msgs,panic,fsck_exit,fsck_last_line,status' > "$CSV"
 
-clean=0; bad=0; nocrash=0
+qemu_run() {
+  local seconds="$1" image="$2" command="$3" output="$4"
+
+  timeout --signal=TERM --kill-after=2s "$seconds" \
+    qemu-system-riscv64 -machine virt -bios none \
+    -kernel kernel/kernel -m 128M -smp "$CPUS" -nographic \
+    -global virtio-mmio.force-legacy=false \
+    -drive "file=$image,if=none,format=raw,id=x0" \
+    -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 \
+    < <(sleep "$BOOT_DELAY"; printf '%s\n' "$command"; sleep "$seconds") \
+    > "$output" 2>&1 || true
+}
+
+pass=0
+fail=0
+points=(1 2 3 4 5)
+
 for ((i = 0; i < RUNS; i++)); do
   seed=$((SEED_BASE + i))
-  RANDOM=$seed
-  n=$((RANDOM % NMAX + 1))
-  tag="s${seed}_p${POINT}_n${n}_c${CPUS}"
+  point="${POINT:-${points[$(((seed - 1) % 5))]}}"
+  n="${COUNT:-$((1 + (seed * 7) % 3))}"
+  tag="s${seed}_p${point}_n${n}_c${CPUS}"
 
-  # 1) build kernel co crash-injection tai lan ghi thu n
-  touch kernel/crash.c
-  make -s kernel/kernel DETFLAGS="-ffile-prefix-map=$PWD=. -DCRASH_DEFAULT_POINT=$POINT -DCRASH_DEFAULT_COUNT=$n" >/dev/null 2>&1 \
-    || { echo "build kernel crash loi"; exit 1; }
-  cp kernel/kernel "$WORK/kernel-crash"
+  image="$WORK/current.img"
+  crashlog="$WORK/logs/${tag}.crash.log"
+  rebootlog="$WORK/logs/${tag}.reboot.log"
 
-  # 2) chay workload tren anh sach cho den khi crash
-  cp "$WORK/fs.base.img" "$WORK/work.img"
-  qemu_run "$WORK/kernel-crash" "$WORK/work.img" "$TIMEOUT" "$WORKLOAD" "$WORK/logs/$tag.crash.log"
-  crashed=0; grep -q "CRASH: point=" "$WORK/logs/$tag.crash.log" && crashed=1
+  cp "$WORK/fs.base.img" "$image"
 
-  # 3) boot lai CUNG anh bang kernel sach (khong crash) de recovery chay
-  qemu_run "$WORK/kernel-clean" "$WORK/work.img" "$REBOOT_SECS" "ls" "$WORK/logs/$tag.reboot.log"
-  rlog="$WORK/logs/$tag.reboot.log"
-  reboot_ok=0; grep -q "init: starting sh" "$rlog" && grep -q "README" "$rlog" && reboot_ok=1
-  rec=$(grep -c "recovering tail" "$rlog")
-  crcm=$(grep -c -E "crc mismatch|bad magic|bad header" "$rlog")
-  pan=$(grep -c "panic" "$rlog")
+  qemu_run "$CRASH_TIMEOUT" "$image" \
+    "crashtest $point $n" "$crashlog"
 
-  # 4) fsck
-  fl=$(./fsck/fsck -n "$WORK/work.img" 2>&1); fx=$?
-  last=$(printf '%s\n' "$fl" | tail -n 1)
+  crashed=0
+  if grep -Fq "CRASH: point=$point" "$crashlog"; then
+    crashed=1
+  fi
 
-  echo "$i,$seed,$CPUS,$POINT,$n,$crashed,$reboot_ok,$rec,$crcm,$pan,$fx,\"$last\"" >> "$CSV"
-  printf '[%d/%d] seed=%d n=%d crashed=%d reboot_ok=%d recovering=%d fsck_exit=%d (%s)\n' \
-    $((i + 1)) "$RUNS" "$seed" "$n" "$crashed" "$reboot_ok" "$rec" "$fx" "$last"
-  if [ $crashed -eq 0 ]; then nocrash=$((nocrash + 1)); elif [ $fx -eq 0 ] && [ $reboot_ok -eq 1 ]; then clean=$((clean + 1)); else bad=$((bad + 1)); fi
+  qemu_run "$REBOOT_TIMEOUT" "$image" 'ls' "$rebootlog"
+
+  reboot_ok=0
+  if grep -Fq 'init: starting sh' "$rebootlog" &&
+     grep -Fq 'README' "$rebootlog"; then
+    reboot_ok=1
+  fi
+
+  recovering="$(grep -c 'recovering tail' "$rebootlog" || true)"
+  crc_msgs="$(grep -Ec 'crc mismatch|bad magic|bad header' "$rebootlog" || true)"
+  panic="$(grep -ci 'panic' "$rebootlog" || true)"
+
+  if fsck_output="$(./fsck/fsck -n "$image" 2>&1)"; then
+    fsck_exit=0
+  else
+    fsck_exit=$?
+  fi
+
+  last_line="$(printf '%s\n' "$fsck_output" | tail -n 1 | tr -d '\r')"
+  last_line="${last_line//\"/\"\"}"
+
+  status=FAIL
+
+  if ((crashed == 1 && reboot_ok == 1 && panic == 0 && fsck_exit == 0)) &&
+     grep -Fq 'fsck: clean' <<< "$fsck_output"; then
+    status=PASS
+    pass=$((pass + 1))
+  else
+    fail=$((fail + 1))
+  fi
+
+  printf '%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,"%s",%s\n' \
+    "$i" "$seed" "$CPUS" "$point" "$n" "$crashed" "$reboot_ok" \
+    "$recovering" "$crc_msgs" "$panic" "$fsck_exit" \
+    "$last_line" "$status" >> "$CSV"
+
+  printf '[%d/%d] %s seed=%d point=%d n=%d crash=%d reboot=%d fsck=%d (%s)\n' \
+    "$((i + 1))" "$RUNS" "$status" "$seed" "$point" "$n" \
+    "$crashed" "$reboot_ok" "$fsck_exit" "$last_line"
 done
 
-# tra kernel ve ban sach de lan make sau khong bi crash ngam
-touch kernel/crash.c; make -s kernel/kernel >/dev/null 2>&1
+printf '[crash_loop] xong: %d lan | crash+clean=%d | fail=%d | CSV: %s\n' \
+  "$RUNS" "$pass" "$fail" "$CSV"
 
-echo "[crash_loop] xong: $RUNS lan | crash+clean=$clean | crash+loi=$bad | khong crash=$nocrash | CSV: $CSV"
-[ $bad -eq 0 ]
+((fail == 0))
