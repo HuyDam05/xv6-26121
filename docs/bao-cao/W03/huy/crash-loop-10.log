@@ -1,0 +1,11 @@
+[1/10] PASS seed=101 point=1 n=3 crash=1 reboot=1 fsck=0 (fsck: clean)
+[2/10] PASS seed=102 point=2 n=1 crash=1 reboot=1 fsck=0 (fsck: clean)
+[3/10] PASS seed=103 point=3 n=2 crash=1 reboot=1 fsck=0 (fsck: clean)
+[4/10] PASS seed=104 point=4 n=3 crash=1 reboot=1 fsck=0 (fsck: clean)
+[5/10] PASS seed=105 point=5 n=1 crash=1 reboot=1 fsck=0 (fsck: clean)
+[6/10] PASS seed=106 point=1 n=2 crash=1 reboot=1 fsck=0 (fsck: clean)
+[7/10] PASS seed=107 point=2 n=3 crash=1 reboot=1 fsck=0 (fsck: clean)
+[8/10] PASS seed=108 point=3 n=1 crash=1 reboot=1 fsck=0 (fsck: clean)
+[9/10] PASS seed=109 point=4 n=2 crash=1 reboot=1 fsck=0 (fsck: clean)
+[10/10] PASS seed=110 point=5 n=3 crash=1 reboot=1 fsck=0 (fsck: clean)
+[crash_loop] xong: 10 lan | crash+clean=10 | fail=0 | CSV: results/crash_runs_after_crc.csv

@@ -1,0 +1,11 @@
+run,seed,cpus,point,n,crashed,reboot_ok,recovering_lines,crc_msgs,panic,fsck_exit,fsck_last_line,status
+0,101,1,1,3,1,1,0,0,0,0,"fsck: clean",PASS
+1,102,1,2,1,1,1,3,0,0,0,"fsck: clean",PASS
+2,103,1,3,2,1,1,3,0,0,0,"fsck: clean",PASS
+3,104,1,4,3,1,1,0,0,0,0,"fsck: clean",PASS
+4,105,1,5,1,1,1,3,0,0,0,"fsck: clean",PASS
+5,106,1,1,2,1,1,0,0,0,0,"fsck: clean",PASS
+6,107,1,2,3,1,1,3,0,0,0,"fsck: clean",PASS
+7,108,1,3,1,1,1,3,0,0,0,"fsck: clean",PASS
+8,109,1,4,2,1,1,0,0,0,0,"fsck: clean",PASS
+9,110,1,5,3,1,1,3,0,0,0,"fsck: clean",PASS
