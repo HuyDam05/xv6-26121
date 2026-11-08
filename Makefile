@@ -217,3 +217,7 @@ check-qemu-version:
 .PHONY: fmt
 fmt:
 	clang-format -i $(wildcard kernel/*.[ch] user/*.[ch] mkfs/*.c)
+
+.PHONY: test
+test: fsck/fsck fsck/corrupt fs.img
+	bash scripts/run_tests.sh

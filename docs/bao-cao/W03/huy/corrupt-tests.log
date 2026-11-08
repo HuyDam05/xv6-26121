@@ -1,0 +1,9 @@
+bash scripts/run_tests.sh
+PASS F01: clean image
+PASS F03: bitmap-clear
+PASS F04: bitmap-set
+PASS F05: nlink-bump
+PASS F06: dup-block
+PASS F07: dirent-drop
+
+Summary: 6 passed, 0 failed
