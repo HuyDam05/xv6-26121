@@ -1,0 +1,33 @@
+
+xv6 kernel is booting
+
+init: starting sh
+$ ls
+.              1 1 1024
+..             1 1 1024
+lost+found     1 2 32
+README         2 3 2441
+cat            2 4 36824
+echo           2 5 35688
+forktest       2 6 18256
+grep           2 7 44280
+init           2 8 36072
+kill           2 9 35616
+ln             2 10 35408
+ls             2 11 42976
+mkdir          2 12 35664
+rm             2 13 35656
+sh             2 14 58408
+stressfs       2 15 36520
+usertests      2 16 206904
+grind          2 17 51920
+wc             2 18 37824
+zombie         2 19 34944
+psinfo         2 20 34832
+logstress      2 21 37664
+forphan        2 22 36448
+dorphan        2 23 35896
+sync           2 24 35048
+crashtest      2 25 42248
+console        3 26 0
+$

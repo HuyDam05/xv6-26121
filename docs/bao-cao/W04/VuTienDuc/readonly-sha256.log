@@ -1,0 +1,25 @@
+W04 - SHA256 read-only verification
+
+corrupt: bitmap-clear block 47 (was allocated)
+ERROR: block 47 is used but marked free in bitmap
+fsck: 1 error(s) found
+fsck exit: 1
+SHA256 before: 4fe4ebedd2913d346075c29bb4d1df380f5e7d9a50cb5b2646aa6c2a822cf128
+SHA256 after:  4fe4ebedd2913d346075c29bb4d1df380f5e7d9a50cb5b2646aa6c2a822cf128
+RESULT: PASS
+
+corrupt: bitmap-set block 1066 (was free)
+ERROR: block 1066 is marked used in bitmap but not referenced
+fsck: 1 error(s) found
+fsck exit: 1
+SHA256 before: 316e7781d4fddc2271541740416e49142f81a9f429e77e175f11168ef8b79e22
+SHA256 after:  316e7781d4fddc2271541740416e49142f81a9f429e77e175f11168ef8b79e22
+RESULT: PASS
+
+corrupt: nlink-bump inode 1: 2 -> 3
+ERROR: inode 1 nlink mismatch (disk=3, expected=2)
+fsck: 1 error(s) found
+fsck exit: 1
+SHA256 before: 32bb85680d7356cf181be0904c5e497963319e6631d3ddc48ccf71a32cb2c09f
+SHA256 after:  32bb85680d7356cf181be0904c5e497963319e6631d3ddc48ccf71a32cb2c09f
+RESULT: PASS

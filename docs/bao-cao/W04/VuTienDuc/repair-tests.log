@@ -1,0 +1,55 @@
+W04 N11 - fsck repair evidence
+Date: 2026-11-14
+
+========== bitmap-clear ==========
+corrupt: bitmap-clear block 47 (was allocated)
+ERROR: block 47 is used but marked free in bitmap
+fsck: 1 error(s) found
+Detect exit: 1
+fsck: repaired 1 bitmap bit(s)
+fsck: repaired 0 nlink(s)
+fsck: clean
+Repair exit: 0
+fsck: clean
+Verify exit: 0
+fsck: repaired 0 bitmap bit(s)
+fsck: repaired 0 nlink(s)
+fsck: clean
+Second repair exit: 0
+========== bitmap-set ==========
+corrupt: bitmap-set block 1066 (was free)
+ERROR: block 1066 is marked used in bitmap but not referenced
+fsck: 1 error(s) found
+Detect exit: 1
+fsck: repaired 1 bitmap bit(s)
+fsck: repaired 0 nlink(s)
+fsck: clean
+Repair exit: 0
+fsck: clean
+Verify exit: 0
+fsck: repaired 0 bitmap bit(s)
+fsck: repaired 0 nlink(s)
+fsck: clean
+Second repair exit: 0
+========== nlink-bump ==========
+corrupt: nlink-bump inode 1: 2 -> 3
+ERROR: inode 1 nlink mismatch (disk=3, expected=2)
+fsck: 1 error(s) found
+Detect exit: 1
+fsck: repaired 0 bitmap bit(s)
+fsck: repaired 1 nlink(s)
+fsck: clean
+Repair exit: 0
+fsck: clean
+Verify exit: 0
+fsck: repaired 0 bitmap bit(s)
+fsck: repaired 0 nlink(s)
+fsck: clean
+Second repair exit: 0
+========== UNSAFE DUP-BLOCK ==========
+corrupt: dup-block inode 3 and inode 4 share block 49
+97d63344567e40829b71248787c48c3d5e70ae213b21a74f8d2f960ef8673154  /tmp/duc-w04-unsafe-evidence.img
+ERROR: block 49 is referenced more than once
+fsck: 1 error(s) found
+Unsafe exit: 1
+97d63344567e40829b71248787c48c3d5e70ae213b21a74f8d2f960ef8673154  /tmp/duc-w04-unsafe-evidence.img

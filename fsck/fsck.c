@@ -185,6 +185,59 @@ check_bitmap(struct superblock *sb)
 }
 
 
+
+/* W04: Repair bitmap only after all structural checks pass. */
+static int
+repair_bitmap(struct superblock *sb)
+{
+  uchar buf[BSIZE];
+  uint nbitmap = (sb->size + BPB - 1) / BPB;
+  uint datastart = sb->bmapstart + nbitmap;
+  int repaired = 0;
+
+  for(uint b = 0; b < datastart; b++)
+    used_blocks[b] = 1;
+
+  for(uint k = 0; k < nbitmap; k++){
+    uint bitmap_bn = sb->bmapstart + k;
+    int changed = 0;
+
+    rblock(bitmap_bn, buf);
+
+    for(uint bit = 0; bit < BPB; bit++){
+      uint bno = k * BPB + bit;
+      if(bno >= sb->size)
+        break;
+
+      uchar mask = (uchar)(1U << (bit % 8));
+      int actual = (buf[bit / 8] & mask) != 0;
+      int expected = used_blocks[bno] != 0;
+
+      if(actual == expected)
+        continue;
+
+      if(expected)
+        buf[bit / 8] |= mask;
+      else
+        buf[bit / 8] &= (uchar)~mask;
+
+      changed = 1;
+      repaired++;
+    }
+
+    if(changed){
+      if(fseek(img, (long)bitmap_bn * BSIZE, SEEK_SET) != 0 ||
+         fwrite(buf, BSIZE, 1, img) != 1 ||
+         fflush(img) != 0){
+        fprintf(stderr, "fsck: bitmap write failed\n");
+        exit(2);
+      }
+    }
+  }
+
+  return repaired;
+}
+
 /* Read an inode from the disk image. */
 static void
 read_disk_inode(struct superblock *sb, uint inum,
@@ -236,7 +289,7 @@ read_directory_entry(struct superblock *sb,
 
 /* Count actual directory links and compare with nlink. */
 static void
-check_nlink(struct superblock *sb)
+check_nlink(struct superblock *sb, short *wanted, uchar *fix)
 {
   uint *links = calloc(sb->ninodes, sizeof(uint));
 
@@ -302,14 +355,57 @@ check_nlink(struct superblock *sb)
       continue;
 
     if(dip.nlink != (int)links[inum]){
-      report("inode %u nlink mismatch (disk=%d, expected=%u)",
-             inum, dip.nlink, links[inum]);
+      if(wanted != NULL && fix != NULL &&
+         links[inum] <= 32767){
+        wanted[inum] = (short)links[inum];
+        fix[inum] = 1;
+      } else {
+        report("inode %u nlink mismatch (disk=%d, expected=%u)",
+               inum, dip.nlink, links[inum]);
+      }
     }
   }
 
   free(links);
 }
 
+
+/* W04: Repair nlink after directory validation. */
+static int
+repair_nlink(struct superblock *sb, short *wanted, uchar *fix)
+{
+  uchar buf[BSIZE];
+  int count = 0;
+
+  for(uint inum = 1; inum < sb->ninodes; inum++){
+    if(!fix[inum])
+      continue;
+
+    uint bn = IBLOCK(inum, (*sb));
+    rblock(bn, buf);
+
+    struct dinode *dip =
+      ((struct dinode *)buf) + (inum % IPB);
+
+    if(dip->type == 0){
+      fprintf(stderr, "fsck: unsafe inode\n");
+      exit(2);
+    }
+
+    dip->nlink = wanted[inum];
+
+    if(fseek(img, (long)bn * BSIZE, SEEK_SET) != 0 ||
+       fwrite(buf, BSIZE, 1, img) != 1 ||
+       fflush(img) != 0){
+      fprintf(stderr, "fsck: nlink write failed\n");
+      exit(2);
+    }
+
+    count++;
+  }
+
+  return count;
+}
 
 static void
 check_directories(struct superblock *sb)
@@ -544,6 +640,7 @@ check_orphans(struct superblock *sb)
   free(queue);
 }
 
+
 int
 main(int argc, char *argv[])
 {
@@ -551,16 +648,37 @@ main(int argc, char *argv[])
   struct superblock sb;
   long imgbytes;
   char *path;
+  int repair_mode = 0;
+  int repaired = 0;
+  int nlink_repaired = 0;
+  short *wanted = NULL;
+  uchar *fix = NULL;
 
-  if(argc < 2 || argc > 3 ||
-     (argc == 3 && strcmp(argv[1], "-n") != 0)){
-    fprintf(stderr, "usage: %s [-n] fs.img\n", argv[0]);
+  if(argc == 3){
+    if(strcmp(argv[1], "-y") == 0)
+      repair_mode = 1;
+    else if(strcmp(argv[1], "-n") != 0){
+      fprintf(stderr, "usage: %s [-n|-y] image\n", argv[0]);
+      return 2;
+    }
+  } else if(argc != 2){
+    fprintf(stderr, "usage: %s [-n|-y] image\n", argv[0]);
     return 2;
   }
 
   path = argv[argc - 1];
 
-  img = fopen(path, "rb");
+  if(repair_mode){
+    const char *base = strrchr(path, '/');
+    base = base ? base + 1 : path;
+
+    if(strcmp(base, "fs.img") == 0){
+      fprintf(stderr, "fsck: refusing to repair fs.img; use a copy\n");
+      return 2;
+    }
+  }
+
+  img = fopen(path, repair_mode ? "r+b" : "rb");
   if(img == NULL){
     perror(path);
     return 2;
@@ -576,8 +694,18 @@ main(int argc, char *argv[])
 
   rblock(1, buf);
   memcpy(&sb, buf, sizeof(sb));
-
   check_superblock(&sb, imgbytes);
+
+  if(nerrors == 0 && repair_mode){
+    uint nbitmap = (sb.size + BPB - 1) / BPB;
+
+    if(sb.ninodes <= ROOTINO ||
+       sb.logstart < 2 ||
+       sb.inodestart <= sb.logstart ||
+       sb.bmapstart <= sb.inodestart ||
+       (unsigned long long)sb.bmapstart + nbitmap >= sb.size)
+      report("unsafe filesystem geometry");
+  }
 
   if(nerrors != 0){
     printf("fsck: %d error(s) found\n", nerrors);
@@ -586,7 +714,6 @@ main(int argc, char *argv[])
   }
 
   used_blocks = calloc(sb.size, sizeof(uchar));
-
   if(used_blocks == NULL){
     fprintf(stderr, "fsck: cannot allocate block table\n");
     fclose(img);
@@ -595,28 +722,52 @@ main(int argc, char *argv[])
 
   check_inodes(&sb);
 
-  if(nerrors == 0)
-    check_bitmap(&sb);
+  if(repair_mode){
+    if(nerrors == 0){
+      wanted = calloc(sb.ninodes, sizeof(short));
+      fix = calloc(sb.ninodes, sizeof(uchar));
 
-  if(nerrors == 0){
-    check_nlink(&sb);
-    check_directories(&sb);
-    check_orphans(&sb);
+      if(wanted == NULL || fix == NULL){
+        fprintf(stderr, "fsck: out of memory\n");
+        exit(2);
+      }
+
+      check_nlink(&sb, wanted, fix);
+      check_directories(&sb);
+      check_orphans(&sb);
+    }
+
+    if(nerrors == 0){
+      nlink_repaired = repair_nlink(&sb, wanted, fix);
+      repaired = repair_bitmap(&sb);
+      check_bitmap(&sb);
+    }
+  } else {
+    /* Preserve the W03 read-only check order. */
+    if(nerrors == 0)
+      check_bitmap(&sb);
+
+    if(nerrors == 0){
+      check_nlink(&sb, NULL, NULL);
+      check_directories(&sb);
+      check_orphans(&sb);
+    }
   }
 
   if(nerrors > 0){
     printf("fsck: %d error(s) found\n", nerrors);
-
     free(used_blocks);
     fclose(img);
-
     return 1;
   }
 
-  printf("fsck: clean\n");
+  if(repair_mode){
+    printf("fsck: repaired %d bitmap bit(s)\n", repaired);
+    printf("fsck: repaired %d nlink(s)\n", nlink_repaired);
+  }
 
+  printf("fsck: clean\n");
   free(used_blocks);
   fclose(img);
-
   return 0;
 }
