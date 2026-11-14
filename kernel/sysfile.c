@@ -528,3 +528,21 @@ sys_pipe(void)
   }
   return 0;
 }
+
+uint64
+sys_fsusage(void)
+{
+  uint64 addr;
+  struct fsusage info;
+  struct proc *p = myproc();
+
+  argaddr(0, &addr);
+
+  if (fsusage_read(ROOTDEV, &info) < 0)
+    return -1;
+
+  if (copyout(p->pagetable, p->sz, addr, (char *)&info, sizeof(info)) < 0)
+    return -1;
+
+  return 0;
+}

@@ -21,6 +21,14 @@ struct superblock {
   uint bmapstart;  // Block number of first free map block
 };
 
+// Filesystem usage statistics.
+struct fsusage {
+  uint total_blocks;
+  uint free_blocks;
+  uint total_inodes;
+  uint free_inodes;
+};
+
 #define FSMAGIC 0x10203040
 
 #define NDIRECT   12

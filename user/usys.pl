@@ -45,3 +45,4 @@ entry("uptime");
 entry("sync");
 entry("psinfo");
 entry("crash_ctl");
+entry("fsusage");
