@@ -9,6 +9,7 @@ struct spinlock;
 struct sleeplock;
 struct stat;
 struct superblock;
+struct fsusage;
 
 // bio.c
 void            binit(void);
@@ -55,6 +56,7 @@ void            stati(struct inode*, struct stat*);
 int             writei(struct inode*, int, uint64, uint, uint);
 void            itrunc(struct inode*);
 void            ireclaim(int);
+int fsusage_read(int, struct fsusage *);
 
 // kalloc.c
 void*           kalloc(void);

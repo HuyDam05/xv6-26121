@@ -48,6 +48,65 @@ fsinit(int dev)
   ireclaim(dev);
 }
 
+int
+fsusage_read(int dev, struct fsusage *out)
+{
+  struct buf *bp;
+  uint b, next, bit;
+  uint inum, last;
+
+  if (out == 0 || sb.nblocks > sb.size || sb.ninodes < 2)
+    return -1;
+
+  memset(out, 0, sizeof(*out));
+
+  out->total_blocks = sb.nblocks;
+  out->total_inodes = sb.ninodes - 1;
+
+  // Count free data blocks using the bitmap.
+  b = sb.size - sb.nblocks;
+
+  while (b < sb.size) {
+    bp = bread(dev, BBLOCK(b, sb));
+
+    next = (b / BPB + 1) * BPB;
+    if (next > sb.size)
+      next = sb.size;
+
+    for (; b < next; b++) {
+      bit = b % BPB;
+
+      if ((bp->data[bit / 8] &
+           (1U << (bit % 8))) == 0) {
+        out->free_blocks++;
+      }
+    }
+
+    brelse(bp);
+  }
+
+  // Count free on-disk inodes.
+  inum = 1;
+
+  while (inum < sb.ninodes) {
+    bp = bread(dev, IBLOCK(inum, sb));
+    struct dinode *dip = (struct dinode *)bp->data;
+
+    last = (inum / IPB + 1) * IPB;
+    if (last > sb.ninodes)
+      last = sb.ninodes;
+
+    for (; inum < last; inum++) {
+      if (dip[inum % IPB].type == 0)
+        out->free_inodes++;
+    }
+
+    brelse(bp);
+  }
+
+  return 0;
+}
+
 // Zero a block.
 static void
 bzero(int dev, int bno)

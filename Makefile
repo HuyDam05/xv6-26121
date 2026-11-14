@@ -155,19 +155,20 @@ UPROGS=\
 	$U/_forphan\
 	$U/_dorphan\
 	$U/_sync\
-	$U/_crashtest
+	$U/_crashtest\
+	$U/_fsusagetest
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)
 
 -include kernel/*.d user/*.d
 
-clean: 
+clean:
 	rm -f *.tex *.dvi *.idx *.aux *.log *.ind *.ilg \
 	*/*.o */*.d */*.asm */*.sym \
 	$K/kernel fs.img \
 	mkfs/mkfs fsck/fsck fsck/corrupt .gdbinit \
-	$U/usys.S \
+   $U/usys.S \
 	$(UPROGS)
 
 check-fs: fsck/fsck fs.img
