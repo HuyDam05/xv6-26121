@@ -102,6 +102,9 @@ boot_check() {
   local log="$WORK/$id.boot.log" why="" replays fsck_out fsck_status
 
   qemu_run "$REBOOT_TIMEOUT" "$image" 'ls' "$log"
+  if [[ -n "${KEEP_LOGS_DIR:-}" ]]; then
+    cp -- "$log" "$KEEP_LOGS_DIR/$id.boot.log"
+  fi
 
   if [[ -n "$expected" ]] && ! grep -Eq "$expected" "$log"; then
     why+=" thieu-thong-bao"
