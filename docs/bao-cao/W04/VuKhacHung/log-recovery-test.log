@@ -1,0 +1,8 @@
+Anh crash diem 2: n=3, magic hop le
+PASS L00: doi chung: anh crash nguyen ven, phai replay
+PASS L01: log-flip: sai 1 byte log block
+PASS L02: log-magic: sai magic
+PASS L03: log-n: n ngoai khoang
+PASS L04: crash_ctl tham so sai: bao loi, khong crash
+
+Summary: 5 passed, 0 failed
