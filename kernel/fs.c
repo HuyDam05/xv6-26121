@@ -76,8 +76,7 @@ fsusage_read(int dev, struct fsusage *out)
     for (; b < next; b++) {
       bit = b % BPB;
 
-      if ((bp->data[bit / 8] &
-           (1U << (bit % 8))) == 0) {
+      if ((bp->data[bit / 8] & (1U << (bit % 8))) == 0) {
         out->free_blocks++;
       }
     }

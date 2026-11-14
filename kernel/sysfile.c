@@ -529,7 +529,6 @@ sys_pipe(void)
   return 0;
 }
 
-
 uint64
 sys_fsusage(void)
 {
@@ -542,8 +541,7 @@ sys_fsusage(void)
   if (fsusage_read(ROOTDEV, &info) < 0)
     return -1;
 
-  if (copyout(p->pagetable, p->sz, addr,
-              (char *)&info, sizeof(info)) < 0)
+  if (copyout(p->pagetable, p->sz, addr, (char *)&info, sizeof(info)) < 0)
     return -1;
 
   return 0;

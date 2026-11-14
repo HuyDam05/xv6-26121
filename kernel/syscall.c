@@ -135,7 +135,7 @@ static uint64 (*syscalls[])(void) = {
   [SYS_psinfo]  = sys_psinfo,
   [SYS_crash_ctl] = sys_crash_ctl,
   [SYS_fsusage] = sys_fsusage,
- // clang-format on
+  // clang-format on
 };
 
 void
