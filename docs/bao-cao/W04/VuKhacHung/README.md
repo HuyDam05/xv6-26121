@@ -61,7 +61,7 @@ Kết quả này chứng minh sau crash máy boot lại được và đĩa sạc
 - `anh/02-usertests-cpus4.png`: `usertests` pass ở `CPUS=4`.
 - `anh/03-crash-loop-p4-p5.png`: bảng kết quả crash loop.
 - `anh/04-pr34-merged-review.png`: PR #34 đã merge, CI xanh, có Approve của Đức.
-
+- `L00.boot.log` đến `L03.boot.log`: log QEMU của từng ca recovery (có `crc mismatch`, `bad magic`, `bad header`).
 PR: #34 (`test(log): add automated log recovery tests (N12)`), commit chính `b7349f1` (script) và `3f57479` (kết quả crash loop), merge ở `3b478b3`.
 
 ## 5. Công việc chưa hoàn thành
