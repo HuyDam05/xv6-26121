@@ -3,6 +3,12 @@
 Cập nhật: 25/10/2026. Bản sơ bộ, mọi dòng đang ở trạng thái Planned. Cột "Cách chạy" sẽ cập nhật khi có script.
 Quy ước điểm crash: (1) sau write_log, trước write_head; (2) ngay sau write_head; (3) giữa install_trans; (4) sau install_trans, trước khi xóa header; (5) lúc ghi bitmap/inode.
 
+Cập nhật: 15/11/2026.
+
+W04: Đã triển khai 15 ca kiểm thử tự động trong make test.
+Crash-loop đã kiểm chứng CPUS=1/4, bao gồm N mở rộng
+từ 1 đến 6. Các trường hợp chưa chạy giữ trạng thái Planned.
+
 | ID | Nhóm | Kịch bản | Kết quả mong đợi | Cách chạy | Trạng thái |
 |---|---|---|---|---|---|
 | L01 | Log | Crash tại điểm (1) | Transaction không có hiệu lực, boot lại không redo, fsck clean | crash_loop | Planned |
@@ -44,3 +50,53 @@ Quy ước điểm crash: (1) sau write_log, trước write_head; (2) ngay sau w
 | R03 | Hồi quy | grind | Không panic | grind | Planned |
 | B01 | Đo đạc | Throughput ghi trước và sau CRC (>=5 lần lặp) | Báo cáo trung bình và độ lệch | bench | Planned |
 | B02 | Đo đạc | Thời gian fsck theo kích thước ảnh | Bảng và đồ thị | bench | Planned |
+
+## W04 – Kết quả kiểm thử N10 (Đàm Quang Huy)
+
+### Automated filesystem tests
+
+Lệnh: make test
+
+Kết quả: 15 passed, 0 failed.
+
+- F01: Clean image – PASS
+- F02a: Bad superblock magic – PASS
+- F02b: Bad superblock size – PASS
+- F03: Bitmap clear detection – PASS
+- F04: Bitmap set detection – PASS
+- F05: Nlink mismatch detection – PASS
+- F06: Duplicate block detection – PASS
+- F07: Dirent drop detection – PASS
+- F12: Read-only image unchanged – PASS
+- F13a: Missing arguments – PASS
+- F13b: Invalid option – PASS
+- F13c: Missing image – PASS
+- Y01: Bitmap clear repair – PASS
+- Y02: Bitmap set repair – PASS
+- Y03: Nlink repair – PASS
+
+### Crash-loop tests
+
+- CPUS=1, seeds 211–220: 10/10 PASS.
+- CPUS=4, seeds 311–320: 10/10 PASS.
+- CPUS=1, NMAX=6, seeds 411–420: 10/10 PASS.
+- CPUS=4, NMAX=6, seeds 511–520: 10/10 PASS.
+- POINT=3, COUNT=4: 1/1 PASS.
+
+Tổng: 40/40 lượt crash-loop PASS và
+1 lượt thử riêng POINT=3, COUNT=4 PASS.
+
+Mỗi lượt kiểm tra crash, reboot và fsck -n clean.
+
+### Evidence
+
+- docs/bao-cao/W04/huy/n10-make-test.log
+- docs/bao-cao/W04/huy/crash_runs_w04_nwide_cpus1.csv
+- docs/bao-cao/W04/huy/crash_runs_w04_nwide_cpus4.csv
+
+### Limitations
+
+- Chưa đạt 200+ lượt crash stress.
+- Chưa bao phủ mọi tổ hợp point và N.
+- Chưa hoàn thành toàn bộ test log corruption.
+- CI cần được xác nhận sau khi push.

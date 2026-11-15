@@ -1,0 +1,12 @@
+riscv64-unknown-elf-ld: warning: kernel/kernel has a LOAD segment with RWX permissions
+[1/10] PASS seed=211 point=1 n=2 crash=1 reboot=1 fsck=0 (fsck: clean)
+[2/10] PASS seed=212 point=2 n=3 crash=1 reboot=1 fsck=0 (fsck: clean)
+[3/10] PASS seed=213 point=3 n=1 crash=1 reboot=1 fsck=0 (fsck: clean)
+[4/10] PASS seed=214 point=4 n=2 crash=1 reboot=1 fsck=0 (fsck: clean)
+[5/10] PASS seed=215 point=5 n=3 crash=1 reboot=1 fsck=0 (fsck: clean)
+[6/10] PASS seed=216 point=1 n=1 crash=1 reboot=1 fsck=0 (fsck: clean)
+[7/10] PASS seed=217 point=2 n=2 crash=1 reboot=1 fsck=0 (fsck: clean)
+[8/10] PASS seed=218 point=3 n=3 crash=1 reboot=1 fsck=0 (fsck: clean)
+[9/10] PASS seed=219 point=4 n=1 crash=1 reboot=1 fsck=0 (fsck: clean)
+[10/10] PASS seed=220 point=5 n=2 crash=1 reboot=1 fsck=0 (fsck: clean)
+[crash_loop] xong: 10 lan | crash+clean=10 | fail=0 | CSV: results/crash_runs_after_crc.csv

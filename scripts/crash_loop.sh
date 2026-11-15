@@ -8,13 +8,14 @@ cd "$ROOT"
 RUNS="${1:-10}"
 SEED_BASE="${SEED_BASE:-101}"
 CPUS="${CPUS:-1}"
+NMAX="${NMAX:-3}"
 BOOT_DELAY="${BOOT_DELAY:-3}"
 CRASH_TIMEOUT="${CRASH_TIMEOUT:-45}"
 REBOOT_TIMEOUT="${REBOOT_TIMEOUT:-9}"
 WORK="results/work-v2"
 CSV="results/crash_runs_after_crc.csv"
 
-for name in RUNS SEED_BASE CPUS; do
+for name in RUNS SEED_BASE CPUS NMAX; do
   value="${!name}"
   if ! [[ "$value" =~ ^[1-9][0-9]*$ ]]; then
     echo "ERROR: $name must be a positive integer" >&2
@@ -62,7 +63,7 @@ points=(1 2 3 4 5)
 for ((i = 0; i < RUNS; i++)); do
   seed=$((SEED_BASE + i))
   point="${POINT:-${points[$(((seed - 1) % 5))]}}"
-  n="${COUNT:-$((1 + (seed * 7) % 3))}"
+  n="${COUNT:-$((1 + (seed * 7) % NMAX))}"
   tag="s${seed}_p${point}_n${n}_c${CPUS}"
 
   image="$WORK/current.img"
