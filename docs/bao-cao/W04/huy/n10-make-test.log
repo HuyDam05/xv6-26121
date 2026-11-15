@@ -1,0 +1,18 @@
+bash scripts/run_tests.sh
+PASS F01: clean image
+PASS F02a: superblock corruption detected
+PASS F02b: superblock corruption detected
+PASS F03: bitmap-clear
+PASS F04: bitmap-set
+PASS F05: nlink-bump
+PASS F06: dup-block
+PASS F07: dirent-drop
+PASS F12: read-only image unchanged
+PASS F13a: invalid argument rejected
+PASS F13b: invalid argument rejected
+PASS F13c: invalid argument rejected
+PASS Y01: bitmap-clear repaired and verified
+PASS Y02: bitmap-set repaired and verified
+PASS Y03: nlink-bump repaired and verified
+
+Summary: 15 passed, 0 failed
