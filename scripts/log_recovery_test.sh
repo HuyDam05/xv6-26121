@@ -205,6 +205,16 @@ else
   tail -n 15 "$WORK/L04.boot.log"
 fi
 
+# --- 4. log-n am: n = -1 (ff ff ff ff) -> bad header, khong replay ---------
+set_negative_n() {
+  printf '\xff\xff\xff\xff' | dd of="$1" bs=1 seek="$HDR" conv=notrunc status=none
+}
+
+cp -- "$CRASH_IMG" "$WORK/L05.img"
+set_negative_n "$WORK/L05.img"
+boot_check L05 'log-n am: n = -1' \
+  "$WORK/L05.img" 'log: bad header n=-1, dropping log' 0
+
 printf '\nSummary: %d passed, %d failed\n' "$passed" "$failed"
 
 if (( failed > 0 )); then
