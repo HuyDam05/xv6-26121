@@ -1,0 +1,35 @@
+
+xv6 kernel is booting
+
+log: crc mismatch, dropping log
+init: starting sh
+$ ls
+.              1 1 1024
+..             1 1 1024
+lost+found     1 2 32
+README         2 3 2441
+cat            2 4 36904
+echo           2 5 35760
+forktest       2 6 17560
+grep           2 7 40344
+init           2 8 36216
+kill           2 9 35696
+ln             2 10 35496
+ls             2 11 39040
+mkdir          2 12 35744
+rm             2 13 35728
+sh             2 14 58760
+stressfs       2 15 36616
+usertests      2 16 202624
+grind          2 17 52168
+wc             2 18 37896
+zombie         2 19 35088
+psinfo         2 20 34976
+logstress      2 21 37680
+forphan        2 22 36496
+dorphan        2 23 35944
+sync           2 24 35160
+crashtest      2 25 38296
+fsusagetest    2 26 38000
+console        3 27 0
+$ qemu-system-riscv64: terminating on signal 15 from pid 8447 (timeout)
