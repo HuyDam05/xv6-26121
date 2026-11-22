@@ -157,7 +157,9 @@ UPROGS=\
 	$U/_sync\
 	$U/_crashtest\
 	$U/_fsusagetest\
-	$U/_ireclaimtest
+	$U/_ireclaimtest\
+	$U/_fsleaktest
+
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)

@@ -1,0 +1,47 @@
+
+xv6 kernel is booting
+
+hart 3 starting
+hart 1 starting
+hart 2 starting
+init: starting sh
+$ fsusagetest
+fsleaktest
+PASS F01 valid statistics
+PASS F02 null pointer
+PASS F03 invalid pointer
+PASS F04 warmup create
+PASS F05 warmup unlink
+PASS F06 baseline
+PASS F07 create
+PASS F08 inode allocation
+PASS F09 write two blocks
+PASS F10 block allocation
+PASS F11 unlink
+PASS F12 resources restored
+fsusagetest: ALL TESTS PASSED
+$ N15 BEFORE: free_blocks=829 free_inodes=170
+N15 ROUND 1 PASS
+N15 ROUND 2 PASS
+N15 ROUND 3 PASS
+N15 ROUND 4 PASS
+N15 ROUND 5 PASS
+N15 ROUND 6 PASS
+N15 ROUND 7 PASS
+N15 ROUND 8 PASS
+N15 ROUND 9 PASS
+N15 ROUND 10 PASS
+N15 ROUND 11 PASS
+N15 ROUND 12 PASS
+N15 ROUND 13 PASS
+N15 ROUND 14 PASS
+N15 ROUND 15 PASS
+N15 ROUND 16 PASS
+N15 ROUND 17 PASS
+N15 ROUND 18 PASS
+N15 ROUND 19 PASS
+N15 ROUND 20 PASS
+N15 AFTER: free_blocks=829 free_inodes=170
+N15 RESULT: PASS
+rounds=20 delta_blocks=0 delta_inodes=0
+$ QEMU: Terminated
