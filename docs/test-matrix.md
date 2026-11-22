@@ -145,3 +145,28 @@ Kết quả: 25 passed, 0 failed; exit code 0.
 - Log recovery mới được chạy trong make test với CPUS=1.
 - Chưa xác nhận CI trên PR W05.
 - Chưa hoàn thành toàn bộ test matrix và stress 200+ lần.
+
+## W05 – N15: Filesystem resource leak test
+
+Phụ trách: Đàm Quang Huy
+
+### Test results
+
+| CPUS | Rounds | Delta blocks | Delta inodes | Result |
+|---|---:|---:|---:|---|
+| 1 | 20 | 0 | 0 | PASS |
+| 4 | 20 | 0 | 0 | PASS |
+
+Workload: create, write, hard link, directory,
+unlink and resource reclamation.
+
+### Evidence
+
+- docs/bao-cao/W05/huy/n15-cpus1.log
+- docs/bao-cao/W05/huy/n15-cpus4.log
+
+### Limitations
+
+Kiểm thử workload tuần tự, chưa chứng minh
+không rò rỉ trong mọi trường hợp crash
+hoặc ghi đồng thời.
