@@ -1,0 +1,26 @@
+=== invalid-lf ===
+SHA256 BEFORE:
+08ed9f63ceb5c2e571972d47f3415e715226bc9cdad6e754f64fa1493e79b785  /tmp/duc-w05-n16b-invalid-lf.img
+ERROR: lost+found has no safe preallocated slot
+fsck: 1 error(s) found
+Repair exit: 1
+SHA256 AFTER:
+08ed9f63ceb5c2e571972d47f3415e715226bc9cdad6e754f64fa1493e79b785  /tmp/duc-w05-n16b-invalid-lf.img
+
+=== full-lf ===
+SHA256 BEFORE:
+9e231bd038009be61b38469ef1dc923669d27a23264751221c4f9057f8743eae  /tmp/duc-w05-n16b-full-lf.img
+ERROR: lost+found has no safe preallocated slot
+fsck: 1 error(s) found
+Repair exit: 1
+SHA256 AFTER:
+9e231bd038009be61b38469ef1dc923669d27a23264751221c4f9057f8743eae  /tmp/duc-w05-n16b-full-lf.img
+
+=== multi-orphan ===
+SHA256 BEFORE:
+52b22e9728a4321db2d2d1552e3b4baf20b2f68209d638fb16749a26ba014166  /tmp/duc-w05-n16b-multi-orphan.img
+ERROR: refusing to recover 2 orphans at once
+fsck: 1 error(s) found
+Repair exit: 1
+SHA256 AFTER:
+52b22e9728a4321db2d2d1552e3b4baf20b2f68209d638fb16749a26ba014166  /tmp/duc-w05-n16b-multi-orphan.img
