@@ -1,0 +1,46 @@
+=== N16A CPUS=1: BEFORE CRASH ===
+
+xv6 kernel is booting
+
+init: starting sh
+$ ireclaimtest prepare
+BASELINE: free_blocks=846 free_inodes=171
+DURING: free_blocks=844 free_inodes=170
+IRECLAIM_READY baseline_blocks=846 baseline_inodes=171
+
+=== N16A CPUS=1: AFTER REBOOT ===
+
+xv6 kernel is booting
+
+ireclaim: orphaned inode 29
+init: starting sh
+$ ireclaimtest verify 846 171
+AFTER: free_blocks=846 free_inodes=171
+PASS ireclaim: inode and blocks restored
+$
+=== N16A CPUS=4: BEFORE CRASH ===
+
+xv6 kernel is booting
+
+hart 3 starting
+hart 2 starting
+hart 1 starting
+init: starting sh
+$ ireclaimtest prepare
+BASELINE: free_blocks=846 free_inodes=171
+DURING: free_blocks=844 free_inodes=170
+IRECLAIM_READY baseline_blocks=846 baseline_inodes=171
+
+=== N16A CPUS=4: AFTER REBOOT ===
+
+xv6 kernel is booting
+
+hart 2 starting
+hart 1 starting
+hart 3 starting
+ireclaim: orphaned inode 29
+init: starting sh
+$ ireclaimtest verify 846 171
+AFTER: free_blocks=846 free_inodes=171
+PASS ireclaim: inode and blocks restored
+$
