@@ -1,0 +1,8 @@
+=== FSCK -n READ-ONLY TEST ===
+SHA256 BEFORE:
+e0b47bde53c10d16c358ec5f71b1bcf3aecf221bdb9167636cf3188c2944127f  /tmp/duc-w05-data-cpus4.img
+FSCK RESULT:
+fsck: clean
+FSCK exit: 0
+SHA256 AFTER:
+e0b47bde53c10d16c358ec5f71b1bcf3aecf221bdb9167636cf3188c2944127f  /tmp/duc-w05-data-cpus4.img

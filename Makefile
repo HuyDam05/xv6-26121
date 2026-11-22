@@ -156,7 +156,8 @@ UPROGS=\
 	$U/_dorphan\
 	$U/_sync\
 	$U/_crashtest\
-	$U/_fsusagetest
+	$U/_fsusagetest\
+	$U/_ireclaimtest
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)
