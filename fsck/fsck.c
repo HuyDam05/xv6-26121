@@ -641,6 +641,235 @@ check_orphans(struct superblock *sb)
 }
 
 
+/*
+ * W05 N16B: conservative offline recovery.
+ * Recover exactly one unreachable regular file with nlink == 1.
+ * The existing lost+found data block must have a free slot;
+ * no block allocation or inode-data modification is performed.
+ */
+static int
+recover_orphans(struct superblock *sb)
+{
+  uchar *reachable = calloc(sb->ninodes, 1);
+  uint *queue = calloc(sb->ninodes, sizeof(uint));
+  uint head = 0, tail = 0;
+  uint candidate = 0, lfino = 0;
+  int count = 0;
+  struct dinode root, lf;
+
+  if (reachable == NULL || queue == NULL) {
+    fprintf(stderr, "fsck: out of memory\n");
+    exit(2);
+  }
+
+  read_disk_inode(sb, ROOTINO, &root);
+  if (root.type != 1 || root.size > MAXFILE * BSIZE ||
+      root.size % sizeof(struct dirent) != 0) {
+    report("unsafe root directory");
+    goto fail;
+  }
+
+  reachable[ROOTINO] = 1;
+  queue[tail++] = ROOTINO;
+
+  /* Walk the directory tree and find the real lost+found. */
+  while (head < tail) {
+    uint inum = queue[head++];
+    struct dinode dir;
+    read_disk_inode(sb, inum, &dir);
+
+    if (dir.type != 1 || dir.size > MAXFILE * BSIZE ||
+        dir.size % sizeof(struct dirent) != 0) {
+      report("unsafe directory inode %u", inum);
+      goto fail;
+    }
+
+    for (uint off = 0; off < dir.size; off += sizeof(struct dirent)) {
+      struct dirent de;
+      struct dinode target;
+
+      if (read_directory_entry(sb, &dir, off, &de) != 0) {
+        report("unreadable directory inode %u", inum);
+        goto fail;
+      }
+
+      if (de.inum == 0)
+        continue;
+
+      if (de.inum >= sb->ninodes) {
+        report("invalid directory entry");
+        goto fail;
+      }
+
+      if (inum == ROOTINO && strncmp(de.name, "lost+found", DIRSIZ) == 0)
+        lfino = de.inum;
+
+      if ((de.name[0] == '.' && de.name[1] == '\0') ||
+          (de.name[0] == '.' && de.name[1] == '.' && de.name[2] == '\0'))
+        continue;
+
+      read_disk_inode(sb, de.inum, &target);
+      if (target.type == 0) {
+        report("directory references free inode %u", de.inum);
+        goto fail;
+      }
+
+      if (reachable[de.inum])
+        continue;
+
+      reachable[de.inum] = 1;
+      if (target.type == 1)
+        queue[tail++] = de.inum;
+    }
+  }
+
+  /* Refuse ambiguous cases, including unreachable directories. */
+  for (uint inum = 1; inum < sb->ninodes; inum++) {
+    struct dinode dip;
+    read_disk_inode(sb, inum, &dip);
+
+    if (dip.type == 0 || reachable[inum] || dip.nlink == 0)
+      continue;
+
+    if (dip.type != 2 || dip.nlink != 1) {
+      report("unsafe orphan inode %u (type=%d nlink=%d)", inum, dip.type,
+             dip.nlink);
+      goto fail;
+    }
+
+    candidate = inum;
+    count++;
+  }
+
+  if (count == 0) {
+    free(reachable);
+    free(queue);
+    return 0;
+  }
+
+  if (count != 1) {
+    report("refusing to recover %d orphans at once", count);
+    goto fail;
+  }
+
+  if (lfino == 0 || lfino == ROOTINO) {
+    report("missing or invalid lost+found");
+    goto fail;
+  }
+
+  read_disk_inode(sb, lfino, &lf);
+
+  if (lf.type != 1 || lf.size % sizeof(struct dirent) != 0 ||
+      lf.size > BSIZE - sizeof(struct dirent) || lf.addrs[0] == 0) {
+    report("lost+found has no safe preallocated slot");
+    goto fail;
+  }
+
+  /*
+   * This limited implementation only appends within the first
+   * existing data block. Never allocate a block here.
+   */
+  uchar block[BSIZE];
+  uint bn = lf.addrs[0];
+  uint datastart = sb->bmapstart + (sb->size + BPB - 1) / BPB;
+
+  if (bn < datastart || bn >= sb->size || !bitmap_is_set(sb, bn)) {
+    report("invalid lost+found data block");
+    goto fail;
+  }
+
+  rblock(bn, block);
+
+  struct dirent existing;
+  memcpy(&existing, block + lf.size, sizeof(existing));
+
+  char name[DIRSIZ] = {0};
+  int name_len = snprintf(name, sizeof(name), "file%u", candidate);
+
+  if (name_len < 0 || name_len >= (int)sizeof(name)) {
+    report("recovery filename too long for inode %u", candidate);
+    goto fail;
+  }
+
+  /*
+   * A previous repair may have written the entry but stopped
+   * before increasing lost+found.size.
+   */
+  int pending_entry =
+    existing.inum == candidate &&
+    strncmp(existing.name, name, DIRSIZ) == 0;
+
+  if (existing.inum != 0 && !pending_entry) {
+    report("lost+found append slot is not empty");
+    goto fail;
+  }
+
+  for (uint off = 0; off < lf.size; off += sizeof(struct dirent)) {
+    struct dirent de;
+    memcpy(&de, block + off, sizeof(de));
+
+    if (de.inum != 0 &&
+        strncmp(de.name, name, DIRSIZ) == 0) {
+      report("lost+found recovery filename already exists");
+      goto fail;
+    }
+  }
+
+  /*
+   * Validate the directory inode before any disk modification.
+   */
+  uchar ibuf[BSIZE];
+  uint ibn = IBLOCK(lfino, (*sb));
+  rblock(ibn, ibuf);
+
+  struct dinode *ondisk =
+    ((struct dinode *)ibuf) + (lfino % IPB);
+
+  if(ondisk->type != 1 || ondisk->size != lf.size ||
+     ondisk->addrs[0] != bn){
+    report("lost+found inode changed during recovery");
+    goto fail;
+  }
+
+  /*
+   * Preflight complete.
+   * Write the directory entry before increasing directory size,
+   * allowing the interrupted-recovery case to be retried.
+   */
+  struct dirent recovered = {0};
+  recovered.inum = candidate;
+  memcpy(recovered.name, name, DIRSIZ);
+  memcpy(block + lf.size, &recovered, sizeof(recovered));
+
+  if(fseek(img, (long)bn * BSIZE, SEEK_SET) != 0 ||
+     fwrite(block, BSIZE, 1, img) != 1 ||
+     fflush(img) != 0){
+    fprintf(stderr, "fsck: recovery entry write failed\\n");
+    exit(2);
+  }
+
+  ondisk->size += sizeof(struct dirent);
+
+  if(fseek(img, (long)ibn * BSIZE, SEEK_SET) != 0 ||
+     fwrite(ibuf, BSIZE, 1, img) != 1 ||
+     fflush(img) != 0){
+    fprintf(stderr, "fsck: recovery inode write failed\\n");
+    exit(2);
+  }
+
+  printf("fsck: recovered inode %u as /lost+found/%s\n", candidate, name);
+
+  free(reachable);
+  free(queue);
+  return 1;
+
+fail:
+  free(reachable);
+  free(queue);
+  return -1;
+}
+
+
 int
 main(int argc, char *argv[])
 {
@@ -732,9 +961,11 @@ main(int argc, char *argv[])
         exit(2);
       }
 
-      check_nlink(&sb, wanted, fix);
       check_directories(&sb);
-      check_orphans(&sb);
+      if(nerrors == 0 && recover_orphans(&sb) >= 0){
+        check_nlink(&sb, wanted, fix);
+        check_orphans(&sb);
+      }
     }
 
     if(nerrors == 0){

@@ -1,0 +1,12 @@
+=== N16B: RECOVERED IMAGE ===
+fsck: clean
+
+=== N16B: INTERRUPTED RECOVERY ===
+fsck: clean
+
+=== N16B: NLINK=0 ===
+WARNING: inode 3 has nlink=0 and is unreachable (possibly pending reclamation)
+fsck: clean
+
+=== N16B: ORIGINAL IMAGE ===
+fsck: clean
