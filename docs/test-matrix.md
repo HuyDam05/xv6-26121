@@ -1,7 +1,11 @@
 # Test matrix - Đề tài 26121 (Crash consistency và fsck)
 
 Cập nhật: 25/10/2026. Bản sơ bộ, mọi dòng đang ở trạng thái Planned. Cột "Cách chạy" sẽ cập nhật khi có script.
-Quy ước điểm crash: (1) sau write_log, trước write_head; (2) ngay sau write_head; (3) giữa install_trans; (4) sau install_trans, trước khi xóa header; (5) lúc ghi bitmap/inode.
+Quy ước điểm crash: (1) Sau write_log, trước write_head.
+(2) Sau write_head (commit point).
+(3) Giữa install_trans.
+(4) Khi ghi block trong bwrite.
+(5) Sau install_trans, trước khi xóa log header.
 
 Cập nhật: 15/11/2026.
 
@@ -100,3 +104,44 @@ Mỗi lượt kiểm tra crash, reboot và fsck -n clean.
 - Chưa bao phủ mọi tổ hợp point và N.
 - Chưa hoàn thành toàn bộ test log corruption.
 - CI cần được xác nhận sau khi push.
+
+## W05 – Kết quả kiểm thử N14 (Đàm Quang Huy)
+
+Ngày kiểm thử: 22/11/2026.
+
+### 1. Automated test integration
+
+Lệnh: `make test`
+
+Kết quả: 25 passed, 0 failed; exit code 0.
+
+- Filesystem tests: 19/19 PASS.
+- Log recovery tests: 6/6 PASS (CPUS=1).
+
+### 2. Các ca kiểm thử bổ sung trong W05
+
+| ID | Nội dung | Kết quả |
+|---|---|---|
+| Y04 | Phục hồi orphan vào /lost+found | PASS |
+| Y05 | Từ chối sửa duplicate block | PASS |
+| Y06 | Từ chối sửa thư mục thiếu entry "." | PASS |
+| Y07 | Kiểm tra fsck -y idempotent | PASS |
+
+### 3. Log recovery integration
+
+- L00: Normal recovery – PASS.
+- L01: CRC mismatch – PASS.
+- L02: Invalid magic – PASS.
+- L03: Invalid log n – PASS.
+- L04: Invalid crash_ctl arguments – PASS.
+- L05: Negative log n – PASS.
+
+### 4. Evidence
+
+- docs/bao-cao/W05/huy/n14-make-test.log
+
+### 5. Limitations
+
+- Log recovery mới được chạy trong make test với CPUS=1.
+- Chưa xác nhận CI trên PR W05.
+- Chưa hoàn thành toàn bộ test matrix và stress 200+ lần.

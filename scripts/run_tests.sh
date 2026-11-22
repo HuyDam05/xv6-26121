@@ -207,6 +207,92 @@ check_repair() {
   fi
 }
 
+check_unsafe_repair() {
+  local id="$1" mode="$2" expected="$3"
+  local image="$WORK/${id}.img"
+  local result status before after
+
+  cp -- fs.img "$image"
+
+  if ! ./fsck/corrupt "$mode" "$image" \
+      > "$WORK/${id}.inject.log" 2>&1; then
+    fail "$id" "cannot inject $mode"
+    return
+  fi
+
+  before="$(sha256sum "$image" | cut -d' ' -f1)"
+
+  if result="$(./fsck/fsck -y "$image" 2>&1)"; then
+    status=0
+  else
+    status=$?
+  fi
+
+  after="$(sha256sum "$image" | cut -d' ' -f1)"
+
+  if [[ "$status" -eq 1 ]] &&
+     grep -Fq "$expected" <<< "$result" &&
+     [[ "$before" == "$after" ]]; then
+    pass "$id" "$mode safely rejected"
+  else
+    fail "$id" "$mode unsafe repair check failed"
+    printf '%s\n' "$result"
+  fi
+}
+
+check_idempotent_repair() {
+  local id="Y07"
+  local image="$WORK/${id}.img"
+  local first second verify
+  local s1 s2 s3 before after
+
+  cp -- fs.img "$image"
+
+  if ! ./fsck/corrupt bitmap-clear "$image" \
+      > "$WORK/${id}.inject.log" 2>&1; then
+    fail "$id" "cannot inject bitmap-clear"
+    return
+  fi
+
+  # First repair
+  if first="$(./fsck/fsck -y "$image" 2>&1)"; then
+    s1=0
+  else
+    s1=$?
+  fi
+
+  before="$(sha256sum "$image" | cut -d' ' -f1)"
+
+  # Second repair
+  if second="$(./fsck/fsck -y "$image" 2>&1)"; then
+    s2=0
+  else
+    s2=$?
+  fi
+
+  after="$(sha256sum "$image" | cut -d' ' -f1)"
+
+  # Verify clean filesystem
+  if verify="$(./fsck/fsck -n "$image" 2>&1)"; then
+    s3=0
+  else
+    s3=$?
+  fi
+
+  if [[ "$s1" -eq 0 && "$s2" -eq 0 && "$s3" -eq 0 ]] &&
+     grep -Fq 'fsck: repaired 1 bitmap bit(s)' <<< "$first" &&
+     grep -Fq 'fsck: repaired 0 bitmap bit(s)' <<< "$second" &&
+     grep -Fq 'fsck: repaired 0 nlink(s)' <<< "$second" &&
+     grep -Fq 'fsck: clean' <<< "$verify" &&
+     [[ "$before" == "$after" ]]; then
+    pass "$id" "fsck -y idempotent"
+  else
+    fail "$id" "idempotent repair failed"
+    printf 'First:\n%s\n' "$first"
+    printf 'Second:\n%s\n' "$second"
+    printf 'Verify:\n%s\n' "$verify"
+  fi
+}
 
 check_clean
 check_bad_superblock F02a 0 'bad magic'
@@ -225,6 +311,10 @@ check_cli_error F13c 'missing.img' -n "$WORK/missing.img"
 check_repair Y01 bitmap-clear 'used but marked free in bitmap'
 check_repair Y02 bitmap-set 'marked used in bitmap but not referenced'
 check_repair Y03 nlink-bump 'nlink mismatch'
+check_repair Y04 dirent-drop 'orphan inode'
+check_unsafe_repair Y05 dup-block 'referenced more than once'
+check_unsafe_repair Y06 dir-dot 'has 0 dot entries'
+check_idempotent_repair
 
 printf '\nSummary: %d passed, %d failed\n' "$passed" "$failed"
 

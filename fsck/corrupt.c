@@ -202,6 +202,50 @@ corrupt_dirent_drop(void)
 }
 
 static void
+corrupt_dir_dot(void)
+{
+  struct dinode root;
+  uchar block[BSIZE];
+
+  read_inode(ROOTINO, &root);
+
+  if(root.type != 1)
+    die("root is not a directory");
+
+  for(uint off = 0;
+      off + sizeof(struct dirent) <= root.size;
+      off += sizeof(struct dirent)){
+
+    uint bno = inode_data_block(&root, off / BSIZE);
+
+    if(!is_data_block(bno))
+      die("invalid root directory block");
+
+    read_block(bno, block);
+
+    uint pos = off % BSIZE;
+    struct dirent entry;
+
+    memcpy(&entry, block + pos, sizeof(entry));
+
+    if(entry.inum == ROOTINO &&
+       entry.name[0] == '.' &&
+       entry.name[1] == '\0'){
+
+      entry.inum = 0;
+
+      memcpy(block + pos, &entry, sizeof(entry));
+      write_block(bno, block);
+
+      printf("corrupt: removed root dot entry\n");
+      return;
+    }
+  }
+
+  die("root dot entry not found");
+}
+
+static void
 corrupt_duplicate_block(void)
 {
   uint first_inode = 0, second_inode = 0, source_bno = 0;
@@ -240,7 +284,7 @@ known_mode(const char *s)
 {
   return strcmp(s, "bitmap-clear") == 0 || strcmp(s, "bitmap-set") == 0 ||
          strcmp(s, "nlink-bump") == 0 || strcmp(s, "dirent-drop") == 0 ||
-         strcmp(s, "dup-block") == 0;
+         strcmp(s, "dup-block") == 0 || strcmp(s, "dir-dot") == 0;
 }
 
 int
@@ -292,6 +336,8 @@ main(int argc, char *argv[])
     corrupt_nlink();
   else if(strcmp(mode, "dirent-drop") == 0)
     corrupt_dirent_drop();
+  else if(strcmp(mode, "dir-dot") == 0)
+    corrupt_dir_dot();
   else
     corrupt_duplicate_block();
 
