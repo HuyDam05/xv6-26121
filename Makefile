@@ -221,5 +221,6 @@ fmt:
 	clang-format -i $(wildcard kernel/*.[ch] user/*.[ch] mkfs/*.c)
 
 .PHONY: test
-test: fsck/fsck fsck/corrupt fs.img
+test: fsck/fsck fsck/corrupt fs.img kernel/kernel
 	bash scripts/run_tests.sh
+	CPUS=1 bash scripts/log_recovery_test.sh
