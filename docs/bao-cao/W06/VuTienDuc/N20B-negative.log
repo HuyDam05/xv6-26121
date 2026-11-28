@@ -1,0 +1,25 @@
+=== REPAIR TEMPORARY IMAGE ===
+WARNING: inode 3 has nlink=0 and is unreachable (possibly pending reclamation)
+WARNING: inode 4 has nlink=0 and is unreachable (possibly pending reclamation)
+WARNING: inode 5 has nlink=0 and is unreachable (possibly pending reclamation)
+fsck: repaired 0 bitmap bit(s)
+fsck: repaired 0 nlink(s)
+fsck: clean
+=== VERIFY TEMPORARY IMAGE ===
+WARNING: inode 3 has nlink=0 and is unreachable (possibly pending reclamation)
+WARNING: inode 4 has nlink=0 and is unreachable (possibly pending reclamation)
+WARNING: inode 5 has nlink=0 and is unreachable (possibly pending reclamation)
+fsck: clean
+PASS: verified image installed
+=== REPAIR TEMPORARY IMAGE ===
+ERROR: block 49 is referenced more than once
+fsck: 1 error(s) found
+ABORT: repair failed; original unchanged
+=== REPAIR TEMPORARY IMAGE ===
+ERROR: refusing to recover 4 orphans at once
+fsck: 1 error(s) found
+ABORT: repair failed; original unchanged
+=== REPAIR TEMPORARY IMAGE ===
+ERROR: inode 5 references invalid block 2010
+fsck: 1 error(s) found
+ABORT: repair failed; original unchanged
