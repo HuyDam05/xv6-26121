@@ -7,6 +7,7 @@
 
 #include "kernel/types.h"
 #include "kernel/fs.h"
+#include "kernel/param.h"
 
 static FILE *image;
 static struct superblock sb;
@@ -279,12 +280,105 @@ corrupt_duplicate_block(void)
          first_inode, second_inode, source_bno);
 }
 
+// ---- log-* modes (W06 N21C) --------------------------------------------
+// Keep in sync with struct logheader and LOG_MAGIC in kernel/log.c.
+#define LOG_MAGIC 0x4C4F4743
+struct logheader {
+  int n;
+  int block[LOGBLOCKS];
+  uint magic;
+  uint crc;
+};
+
+static void
+read_log_header(struct logheader *lh)
+{
+  uchar block[BSIZE];
+  read_block(sb.logstart, block);
+  memcpy(lh, block, sizeof(*lh));
+}
+
+static void
+write_log_header(const struct logheader *lh)
+{
+  uchar block[BSIZE];
+  read_block(sb.logstart, block);
+  memcpy(block, lh, sizeof(*lh));
+  write_block(sb.logstart, block);
+}
+
+// A usable fixture has a committed but not yet installed transaction:
+// valid magic, 0 < n <= LOGBLOCKS, and at least one log block that still
+// differs from its home block. Otherwise a corruption test proves nothing.
+static void
+require_pending_log(struct logheader *lh)
+{
+  uchar logged[BSIZE], home[BSIZE];
+  int pending = 0;
+
+  read_log_header(lh);
+  if(lh->magic != LOG_MAGIC)
+    die("log header has no valid magic: image has no committed log");
+  if(lh->n <= 0 || lh->n > LOGBLOCKS || (uint)lh->n + 1 > sb.nlog)
+    die("log has no committed transaction (n out of range)");
+  for(int i = 0; i < lh->n; i++){
+    uint dst = (uint)lh->block[i];
+    if(dst >= sb.size)
+      die("log entry points outside the image");
+    read_block(sb.logstart + 1 + i, logged);
+    read_block(dst, home);
+    if(memcmp(logged, home, BSIZE) != 0)
+      pending = 1;
+  }
+  if(!pending)
+    die("log is already installed: nothing for recovery to replay");
+}
+
+// Flip all bits of one byte inside the first log block.
+static void
+corrupt_log_flip(void)
+{
+  struct logheader lh;
+  uchar block[BSIZE];
+  require_pending_log(&lh);
+  uint bno = sb.logstart + 1;
+  read_block(bno, block);
+  block[10] ^= 0xff;
+  write_block(bno, block);
+  printf("corrupt: log-flip byte 10 of log block %u (n=%d)\n", bno, lh.n);
+}
+
+// Flip all bits of the low byte of the header magic.
+static void
+corrupt_log_magic(void)
+{
+  struct logheader lh;
+  require_pending_log(&lh);
+  uint old = lh.magic;
+  lh.magic ^= 0xff;
+  write_log_header(&lh);
+  printf("corrupt: log-magic 0x%x -> 0x%x (n=%d)\n", old, lh.magic, lh.n);
+}
+
+static void
+corrupt_log_n(int value)
+{
+  struct logheader lh;
+  require_pending_log(&lh);
+  int old = lh.n;
+  lh.n = value;
+  write_log_header(&lh);
+  printf("corrupt: log-n n %d -> %d\n", old, value);
+}
+
 static int
 known_mode(const char *s)
 {
   return strcmp(s, "bitmap-clear") == 0 || strcmp(s, "bitmap-set") == 0 ||
          strcmp(s, "nlink-bump") == 0 || strcmp(s, "dirent-drop") == 0 ||
-         strcmp(s, "dup-block") == 0 || strcmp(s, "dir-dot") == 0;
+         strcmp(s, "dup-block") == 0 || strcmp(s, "dir-dot") == 0 ||
+         strcmp(s, "log-flip") == 0 || strcmp(s, "log-magic") == 0 ||
+         strcmp(s, "log-n") == 0 || strcmp(s, "log-n-neg") == 0;
 }
 
 int
@@ -338,8 +432,16 @@ main(int argc, char *argv[])
     corrupt_dirent_drop();
   else if(strcmp(mode, "dir-dot") == 0)
     corrupt_dir_dot();
-  else
+  else if(strcmp(mode, "dup-block") == 0)
     corrupt_duplicate_block();
+  else if(strcmp(mode, "log-flip") == 0)
+    corrupt_log_flip();
+  else if(strcmp(mode, "log-magic") == 0)
+    corrupt_log_magic();
+  else if(strcmp(mode, "log-n") == 0)
+    corrupt_log_n(255);
+  else
+    corrupt_log_n(-1);
 
   if(fclose(image) != 0)
     die("failed to close image");
