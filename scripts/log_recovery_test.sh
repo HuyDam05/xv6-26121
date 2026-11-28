@@ -12,6 +12,7 @@
 #   L04  crash_ctl  : tham so sai           -> "invalid argument", khong crash
 #
 # Moi ca kiem tra: thong bao dung, khong panic, shell len, fsck -n clean.
+# Loi duoc tiem bang ./fsck/corrupt log-flip|log-magic|log-n|log-n-neg.
 
 set -euo pipefail
 
@@ -23,20 +24,20 @@ BOOT_DELAY="${BOOT_DELAY:-3}"
 CRASH_TIMEOUT="${CRASH_TIMEOUT:-45}"
 REBOOT_TIMEOUT="${REBOOT_TIMEOUT:-9}"
 
-# Bo cuc dia: block 2 = log header, block 3.. = log block dau tien.
+# Bo cuc dia: block 2 = log header. Chi dung de kiem tra doc lap rang anh crash
+# that su co log (khong phu thuoc cong cu corrupt).
 # logheader: n (4 B) + block[30] (120 B) + magic (4 B) + crc (4 B).
 HDR=$((2 * 1024))
-LOG0=$((3 * 1024))
 MAGIC_OFF=$((HDR + 124))
 
-for tool in qemu-system-riscv64 timeout make xxd dd; do
+for tool in qemu-system-riscv64 timeout make xxd; do
   command -v "$tool" > /dev/null || {
     echo "Missing: $tool" >&2
     exit 2
   }
 done
 
-make -s kernel/kernel fs.img fsck/fsck
+make -s kernel/kernel fs.img fsck/fsck fsck/corrupt
 
 WORK="$(mktemp -d)"
 trap 'rm -rf -- "$WORK"' EXIT
@@ -67,21 +68,13 @@ qemu_run() {
     > "$output" 2>&1 || true
 }
 
-byte_at() {
-  xxd -s "$2" -l 1 -p "$1"
-}
-
-# Dao toan bo bit cua 1 byte tai offset.
-flip_byte() {
-  local image="$1" off="$2" old new
-  old="$(byte_at "$image" "$off")"
-  new="$(printf '%02x' $((0x$old ^ 0xff)))"
-  printf "\x$new" | dd of="$image" bs=1 seek="$off" conv=notrunc status=none
-}
-
-# Dat n = 255 (> LOGBLOCKS = 30), little-endian.
-set_bad_n() {
-  printf '\xff\x00\x00\x00' | dd of="$1" bs=1 seek="$HDR" conv=notrunc status=none
+# Tiem loi bang cong cu corrupt; cong cu tu tu choi anh khong co log da commit.
+#   $1 = mode (log-flip, log-magic, log-n, log-n-neg), $2 = anh
+corrupt_img() {
+  ./fsck/corrupt "$1" "$2" > /dev/null || {
+    echo "ERROR: corrupt $1 that bai tren $2" >&2
+    exit 2
+  }
 }
 
 header_n() {
@@ -175,17 +168,17 @@ boot_check L00 'doi chung: anh crash nguyen ven, phai replay' \
   "$WORK/L00.img" '' 1
 
 cp -- "$CRASH_IMG" "$WORK/L01.img"
-flip_byte "$WORK/L01.img" $((LOG0 + 10))
+corrupt_img log-flip "$WORK/L01.img"
 boot_check L01 'log-flip: sai 1 byte log block' \
   "$WORK/L01.img" 'log: crc mismatch, dropping log' 0
 
 cp -- "$CRASH_IMG" "$WORK/L02.img"
-flip_byte "$WORK/L02.img" "$MAGIC_OFF"
+corrupt_img log-magic "$WORK/L02.img"
 boot_check L02 'log-magic: sai magic' \
   "$WORK/L02.img" 'log: bad magic, dropping log' 0
 
 cp -- "$CRASH_IMG" "$WORK/L03.img"
-set_bad_n "$WORK/L03.img"
+corrupt_img log-n "$WORK/L03.img"
 boot_check L03 'log-n: n ngoai khoang' \
   "$WORK/L03.img" 'log: bad header n=255, dropping log' 0
 
@@ -206,12 +199,8 @@ else
 fi
 
 # --- 4. log-n am: n = -1 (ff ff ff ff) -> bad header, khong replay ---------
-set_negative_n() {
-  printf '\xff\xff\xff\xff' | dd of="$1" bs=1 seek="$HDR" conv=notrunc status=none
-}
-
 cp -- "$CRASH_IMG" "$WORK/L05.img"
-set_negative_n "$WORK/L05.img"
+corrupt_img log-n-neg "$WORK/L05.img"
 boot_check L05 'log-n am: n = -1' \
   "$WORK/L05.img" 'log: bad header n=-1, dropping log' 0
 
