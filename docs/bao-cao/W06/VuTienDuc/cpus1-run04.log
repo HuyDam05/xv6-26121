@@ -1,0 +1,66 @@
+CPUS=1 RUN=4
+
+=== PREPARE ===
+
+xv6 kernel is booting
+
+init: starting sh
+$ ireclaimtest prepare
+ireclaimtest prepare
+BASELINE: free_blocks=798 free_inodes=170
+ORPHAN_READY file=ireclaim0.tmp fd=3
+ORPHAN_READY file=ireclaim1.tmp fd=4
+ORPHAN_READY file=ireclaim2.tmp fd=5
+ORPHAN_READY file=ireclaim3.tmp fd=6
+ORPHAN_READY file=ireclaim4.tmp fd=7
+ORPHAN_READY file=ireclaim5.tmp fd=8
+ORPHAN_READY file=ireclaim6.tmp fd=9
+ORPHAN_READY file=ireclaim7.tmp fd=10
+DURING: free_blocks=782 free_inodes=162
+ALLOCATED blocks=16 inodes=8
+IRECLAIM_READY baseline_blocks=798 baseline_inodes=170
+
+=== CRASH: SIGKILL ===
+
+=== BEFORE REBOOT FSCK ===
+WARNING: inode 30 has nlink=0 and is unreachable (possibly pending reclamation)
+WARNING: inode 31 has nlink=0 and is unreachable (possibly pending reclamation)
+WARNING: inode 32 has nlink=0 and is unreachable (possibly pending reclamation)
+WARNING: inode 33 has nlink=0 and is unreachable (possibly pending reclamation)
+WARNING: inode 34 has nlink=0 and is unreachable (possibly pending reclamation)
+WARNING: inode 35 has nlink=0 and is unreachable (possibly pending reclamation)
+WARNING: inode 36 has nlink=0 and is unreachable (possibly pending reclamation)
+WARNING: inode 37 has nlink=0 and is unreachable (possibly pending reclamation)
+fsck: clean
+
+=== REBOOT ===
+
+xv6 kernel is booting
+
+ireclaim: orphaned inode 30
+ireclaim: orphaned inode 31
+ireclaim: orphaned inode 32
+ireclaim: orphaned inode 33
+ireclaim: orphaned inode 34
+ireclaim: orphaned inode 35
+ireclaim: orphaned inode 36
+ireclaim: orphaned inode 37
+init: starting sh
+$ ireclaimtest verify 798 170
+ireclaimtest verify 798 170
+AFTER: free_blocks=798 free_inodes=170
+VERIFIED_UNREACHABLE file=ireclaim0.tmp
+VERIFIED_UNREACHABLE file=ireclaim1.tmp
+VERIFIED_UNREACHABLE file=ireclaim2.tmp
+VERIFIED_UNREACHABLE file=ireclaim3.tmp
+VERIFIED_UNREACHABLE file=ireclaim4.tmp
+VERIFIED_UNREACHABLE file=ireclaim5.tmp
+VERIFIED_UNREACHABLE file=ireclaim6.tmp
+VERIFIED_UNREACHABLE file=ireclaim7.tmp
+PASS ireclaim: inode and blocks restored
+PASS stress: all 8 orphan files reclaimed
+$
+=== POST-RECOVERY FSCK ===
+fsck: clean
+
+PASS: complete crash/reboot cycle

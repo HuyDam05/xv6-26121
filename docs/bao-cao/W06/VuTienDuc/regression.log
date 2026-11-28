@@ -1,0 +1,33 @@
+gcc -Werror -Wall -I. -o fsck/corrupt fsck/corrupt.c
+bash scripts/run_tests.sh
+PASS F01: clean image
+PASS F02a: superblock corruption detected
+PASS F02b: superblock corruption detected
+PASS F03: bitmap-clear
+PASS F04: bitmap-set
+PASS F05: nlink-bump
+PASS F06: dup-block
+PASS F07: dirent-drop
+PASS F12: read-only image unchanged
+PASS F13a: invalid argument rejected
+PASS F13b: invalid argument rejected
+PASS F13c: invalid argument rejected
+PASS Y01: bitmap-clear repaired and verified
+PASS Y02: bitmap-set repaired and verified
+PASS Y03: nlink-bump repaired and verified
+PASS Y04: dirent-drop repaired and verified
+PASS Y05: dup-block safely rejected
+PASS Y06: dir-dot safely rejected
+PASS Y07: fsck -y idempotent
+
+Summary: 19 passed, 0 failed
+CPUS=1 bash scripts/log_recovery_test.sh
+Anh crash diem 2: n=3, magic hop le
+PASS L00: doi chung: anh crash nguyen ven, phai replay
+PASS L01: log-flip: sai 1 byte log block
+PASS L02: log-magic: sai magic
+PASS L03: log-n: n ngoai khoang
+PASS L04: crash_ctl tham so sai: bao loi, khong crash
+PASS L05: log-n am: n = -1
+
+Summary: 6 passed, 0 failed
