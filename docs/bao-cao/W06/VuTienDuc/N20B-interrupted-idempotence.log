@@ -1,0 +1,17 @@
+=== INTERRUPTED REPAIR ===
+4191cb847b83036e798ca71730e23611fedaf934a6f1cb006ea300cdd63dce0b  /tmp/duc-w06-multi-orphan/neg07-interrupted.img
+4191cb847b83036e798ca71730e23611fedaf934a6f1cb006ea300cdd63dce0b  /tmp/duc-w06-multi-orphan/three-orphans-retest.img
+PASS: interrupted repair image matches normal repair
+
+=== IDEMPOTENCE ===
+=== REPAIR TEMPORARY IMAGE ===
+fsck: repaired 0 bitmap bit(s)
+fsck: repaired 0 nlink(s)
+fsck: clean
+=== VERIFY TEMPORARY IMAGE ===
+fsck: clean
+PASS: verified image installed
+REPAIR EXIT: 0
+BEFORE SHA256: 4191cb847b83036e798ca71730e23611fedaf934a6f1cb006ea300cdd63dce0b
+AFTER SHA256:  4191cb847b83036e798ca71730e23611fedaf934a6f1cb006ea300cdd63dce0b
+PASS: repair is idempotent

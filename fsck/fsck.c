@@ -653,11 +653,12 @@ recover_orphans(struct superblock *sb)
   uchar *reachable = calloc(sb->ninodes, 1);
   uint *queue = calloc(sb->ninodes, sizeof(uint));
   uint head = 0, tail = 0;
-  uint candidate = 0, lfino = 0;
+  uint lfino = 0;
+  uint *candidates = calloc(sb->ninodes, sizeof(uint));
   int count = 0;
   struct dinode root, lf;
 
-  if (reachable == NULL || queue == NULL) {
+  if (reachable == NULL || queue == NULL || candidates == NULL) {
     fprintf(stderr, "fsck: out of memory\n");
     exit(2);
   }
@@ -701,8 +702,13 @@ recover_orphans(struct superblock *sb)
         goto fail;
       }
 
-      if (inum == ROOTINO && strncmp(de.name, "lost+found", DIRSIZ) == 0)
+      if (inum == ROOTINO && strncmp(de.name, "lost+found", DIRSIZ) == 0) {
+        if (lfino != 0) {
+          report("duplicate lost+found directory entry");
+          goto fail;
+        }
         lfino = de.inum;
+      }
 
       if ((de.name[0] == '.' && de.name[1] == '\0') ||
           (de.name[0] == '.' && de.name[1] == '.' && de.name[2] == '\0'))
@@ -737,17 +743,30 @@ recover_orphans(struct superblock *sb)
       goto fail;
     }
 
-    candidate = inum;
-    count++;
+    if (dip.size > MAXFILE * BSIZE) {
+      report("unsafe orphan size for inode %u", inum);
+      goto fail;
+    }
+
+    if (inum > 65535U) {
+      report("orphan inode cannot fit in directory entry");
+      goto fail;
+    }
+
+    candidates[count++] = inum;
   }
 
   if (count == 0) {
     free(reachable);
     free(queue);
+    free(candidates);
     return 0;
   }
 
-  if (count != 1) {
+  /*
+   * W06 N20B: conservatively support up to three orphan files.
+   */
+  if (count > 3) {
     report("refusing to recover %d orphans at once", count);
     goto fail;
   }
@@ -760,7 +779,8 @@ recover_orphans(struct superblock *sb)
   read_disk_inode(sb, lfino, &lf);
 
   if (lf.type != 1 || lf.size % sizeof(struct dirent) != 0 ||
-      lf.size > BSIZE - sizeof(struct dirent) || lf.addrs[0] == 0) {
+      lf.size > BSIZE ||
+      (uint)count > (BSIZE - lf.size) / sizeof(struct dirent) || lf.addrs[0] == 0) {
     report("lost+found has no safe preallocated slot");
     goto fail;
   }
@@ -778,45 +798,154 @@ recover_orphans(struct superblock *sb)
     goto fail;
   }
 
-  rblock(bn, block);
-
-  struct dirent existing;
-  memcpy(&existing, block + lf.size, sizeof(existing));
-
-  char name[DIRSIZ] = {0};
-  int name_len = snprintf(name, sizeof(name), "file%u", candidate);
-
-  if (name_len < 0 || name_len >= (int)sizeof(name)) {
-    report("recovery filename too long for inode %u", candidate);
-    goto fail;
-  }
-
   /*
-   * A previous repair may have written the entry but stopped
-   * before increasing lost+found.size.
+   * Reject candidates referenced by any allocated directory,
+   * including directories outside the reachable tree.
    */
-  int pending_entry =
-    existing.inum == candidate &&
-    strncmp(existing.name, name, DIRSIZ) == 0;
+  for (uint d = 1; d < sb->ninodes; d++) {
+    struct dinode dir;
+    read_disk_inode(sb, d, &dir);
 
-  if (existing.inum != 0 && !pending_entry) {
-    report("lost+found append slot is not empty");
-    goto fail;
-  }
+    if (dir.type != 1)
+      continue;
 
-  for (uint off = 0; off < lf.size; off += sizeof(struct dirent)) {
-    struct dirent de;
-    memcpy(&de, block + off, sizeof(de));
-
-    if (de.inum != 0 &&
-        strncmp(de.name, name, DIRSIZ) == 0) {
-      report("lost+found recovery filename already exists");
+    if (dir.size > MAXFILE * BSIZE ||
+        dir.size % sizeof(struct dirent) != 0) {
+      report("unsafe directory inode %u", d);
       goto fail;
+    }
+
+    for (uint off = 0; off < dir.size;
+         off += sizeof(struct dirent)) {
+      struct dirent de;
+
+      if (read_directory_entry(sb, &dir, off, &de) != 0) {
+        report("unreadable directory inode %u", d);
+        goto fail;
+      }
+
+      for (int i = 0; i < count; i++) {
+        if (de.inum == candidates[i]) {
+          report("orphan inode %u still referenced by directory %u",
+                 candidates[i], d);
+          goto fail;
+        }
+      }
     }
   }
 
   /*
-   * Validate the directory inode before any disk modification.
+   * Validate each candidate's complete block mapping.
+   */
+  for (int i = 0; i < count; i++) {
+    struct dinode dip;
+    read_disk_inode(sb, candidates[i], &dip);
+
+    uint needed = (dip.size + BSIZE - 1) / BSIZE;
+
+    for (uint j = 0; j < NDIRECT; j++) {
+      uint b = dip.addrs[j];
+
+      if (j < needed) {
+        if (b < datastart || b >= sb->size ||
+            !bitmap_is_set(sb, b)) {
+          report("unsafe direct block in orphan inode %u",
+                 candidates[i]);
+          goto fail;
+        }
+      } else if (b != 0) {
+        report("unexpected direct block in orphan inode %u",
+               candidates[i]);
+        goto fail;
+      }
+    }
+
+    uint indirect = dip.addrs[NDIRECT];
+
+    if (needed > NDIRECT) {
+      uint entries[NINDIRECT];
+
+      if (indirect < datastart || indirect >= sb->size ||
+          !bitmap_is_set(sb, indirect)) {
+        report("unsafe indirect block in orphan inode %u",
+               candidates[i]);
+        goto fail;
+      }
+
+      rblock(indirect, entries);
+
+      for (uint j = 0; j < NINDIRECT; j++) {
+        uint b = entries[j];
+
+        if (j < needed - NDIRECT) {
+          if (b < datastart || b >= sb->size ||
+              !bitmap_is_set(sb, b)) {
+            report("unsafe indirect data in orphan inode %u",
+                   candidates[i]);
+            goto fail;
+          }
+        } else if (b != 0) {
+          report("unexpected indirect data in orphan inode %u",
+                 candidates[i]);
+          goto fail;
+        }
+      }
+    } else if (indirect != 0) {
+      report("unexpected indirect block in orphan inode %u",
+             candidates[i]);
+      goto fail;
+    }
+  }
+
+  rblock(bn, block);
+
+  /*
+   * Prepare every recovery entry in memory before writing.
+   */
+  for (int i = 0; i < count; i++) {
+    uint candidate = candidates[i];
+    uint offset = lf.size + i * sizeof(struct dirent);
+
+    char name[DIRSIZ] = {0};
+    int name_len = snprintf(name, sizeof(name), "file%u", candidate);
+
+    if (name_len < 0 || name_len >= (int)sizeof(name)) {
+      report("recovery filename too long");
+      goto fail;
+    }
+
+    for (uint off = 0; off < offset;
+         off += sizeof(struct dirent)) {
+      struct dirent de;
+      memcpy(&de, block + off, sizeof(de));
+
+      if (de.inum != 0 &&
+          strncmp(de.name, name, DIRSIZ) == 0) {
+        report("lost+found recovery filename already exists");
+        goto fail;
+      }
+    }
+
+    struct dirent existing;
+    memcpy(&existing, block + offset, sizeof(existing));
+
+    int pending_entry =
+      existing.inum == candidate &&
+      strncmp(existing.name, name, DIRSIZ) == 0;
+
+    if (existing.inum != 0 && !pending_entry) {
+      report("lost+found append slot is not empty");
+      goto fail;
+    }
+
+    struct dirent recovered = {0};
+    recovered.inum = candidate;
+    memcpy(recovered.name, name, DIRSIZ);
+    memcpy(block + offset, &recovered, sizeof(recovered));
+  }
+
+  /*
+   * Validate directory inode before any disk modification.
    */
   uchar ibuf[BSIZE];
   uint ibn = IBLOCK(lfino, (*sb));
@@ -825,47 +954,45 @@ recover_orphans(struct superblock *sb)
   struct dinode *ondisk =
     ((struct dinode *)ibuf) + (lfino % IPB);
 
-  if(ondisk->type != 1 || ondisk->size != lf.size ||
-     ondisk->addrs[0] != bn){
+  if (ondisk->type != 1 || ondisk->size != lf.size ||
+      ondisk->addrs[0] != bn) {
     report("lost+found inode changed during recovery");
     goto fail;
   }
 
   /*
-   * Preflight complete.
-   * Write the directory entry before increasing directory size,
-   * allowing the interrupted-recovery case to be retried.
+   * Write planned entries, then publish the new directory size.
    */
-  struct dirent recovered = {0};
-  recovered.inum = candidate;
-  memcpy(recovered.name, name, DIRSIZ);
-  memcpy(block + lf.size, &recovered, sizeof(recovered));
-
-  if(fseek(img, (long)bn * BSIZE, SEEK_SET) != 0 ||
-     fwrite(block, BSIZE, 1, img) != 1 ||
-     fflush(img) != 0){
-    fprintf(stderr, "fsck: recovery entry write failed\\n");
+  if (fseek(img, (long)bn * BSIZE, SEEK_SET) != 0 ||
+      fwrite(block, BSIZE, 1, img) != 1 ||
+      fflush(img) != 0) {
+    fprintf(stderr, "fsck: recovery entry write failed\n");
     exit(2);
   }
 
-  ondisk->size += sizeof(struct dirent);
+  ondisk->size += count * sizeof(struct dirent);
 
-  if(fseek(img, (long)ibn * BSIZE, SEEK_SET) != 0 ||
-     fwrite(ibuf, BSIZE, 1, img) != 1 ||
-     fflush(img) != 0){
-    fprintf(stderr, "fsck: recovery inode write failed\\n");
+  if (fseek(img, (long)ibn * BSIZE, SEEK_SET) != 0 ||
+      fwrite(ibuf, BSIZE, 1, img) != 1 ||
+      fflush(img) != 0) {
+    fprintf(stderr, "fsck: recovery inode write failed\n");
     exit(2);
   }
 
-  printf("fsck: recovered inode %u as /lost+found/%s\n", candidate, name);
+  for (int i = 0; i < count; i++) {
+    printf("fsck: recovered inode %u as /lost+found/file%u\n",
+           candidates[i], candidates[i]);
+  }
 
   free(reachable);
   free(queue);
+  free(candidates);
   return 1;
 
 fail:
   free(reachable);
   free(queue);
+  free(candidates);
   return -1;
 }
 

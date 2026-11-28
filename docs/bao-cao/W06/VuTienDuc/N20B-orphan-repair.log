@@ -1,0 +1,41 @@
+=== RECOVER two ORPHANS ===
+ERROR: inode 3 nlink mismatch (disk=1, expected=0)
+ERROR: inode 4 nlink mismatch (disk=1, expected=0)
+ERROR: orphan inode 3: nlink=1, unreachable from root
+ERROR: orphan inode 4: nlink=1, unreachable from root
+fsck: 4 error(s) found
+BEFORE EXIT: 1
+=== REPAIR TEMPORARY IMAGE ===
+fsck: recovered inode 3 as /lost+found/file3
+fsck: recovered inode 4 as /lost+found/file4
+fsck: repaired 0 bitmap bit(s)
+fsck: repaired 0 nlink(s)
+fsck: clean
+=== VERIFY TEMPORARY IMAGE ===
+fsck: clean
+PASS: verified image installed
+REPAIR EXIT: 0
+fsck: clean
+VERIFY EXIT: 0
+=== RECOVER three ORPHANS ===
+ERROR: inode 3 nlink mismatch (disk=1, expected=0)
+ERROR: inode 4 nlink mismatch (disk=1, expected=0)
+ERROR: inode 5 nlink mismatch (disk=1, expected=0)
+ERROR: orphan inode 3: nlink=1, unreachable from root
+ERROR: orphan inode 4: nlink=1, unreachable from root
+ERROR: orphan inode 5: nlink=1, unreachable from root
+fsck: 6 error(s) found
+BEFORE EXIT: 1
+=== REPAIR TEMPORARY IMAGE ===
+fsck: recovered inode 3 as /lost+found/file3
+fsck: recovered inode 4 as /lost+found/file4
+fsck: recovered inode 5 as /lost+found/file5
+fsck: repaired 0 bitmap bit(s)
+fsck: repaired 0 nlink(s)
+fsck: clean
+=== VERIFY TEMPORARY IMAGE ===
+fsck: clean
+PASS: verified image installed
+REPAIR EXIT: 0
+fsck: clean
+VERIFY EXIT: 0

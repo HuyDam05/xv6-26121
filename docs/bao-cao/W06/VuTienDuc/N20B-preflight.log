@@ -1,0 +1,52 @@
+
+=== DIRECT PREFLIGHT: neg01-full-slots ===
+ERROR: lost+found has no safe preallocated slot
+fsck: 1 error(s) found
+EXIT: 1
+BEFORE SHA256: d0eea0e6f0df9dec1c4963cd582b780cf453a5c919e0eb5cb771a92c6eeedc35
+AFTER SHA256:  d0eea0e6f0df9dec1c4963cd582b780cf453a5c919e0eb5cb771a92c6eeedc35
+PASS: direct repair refused without modifying image
+
+=== DIRECT PREFLIGHT: neg02-name-conflict ===
+ERROR: lost+found recovery filename already exists
+fsck: 1 error(s) found
+EXIT: 1
+BEFORE SHA256: 8bf620b4281ee442ea7925299a58bcec65e841a8c083bfa90f52b3c164930e25
+AFTER SHA256:  8bf620b4281ee442ea7925299a58bcec65e841a8c083bfa90f52b3c164930e25
+PASS: direct repair refused without modifying image
+
+=== DIRECT PREFLIGHT: neg04-orphan-directory ===
+ERROR: unsafe orphan inode 2 (type=1 nlink=1)
+fsck: 1 error(s) found
+EXIT: 1
+BEFORE SHA256: 32514671eba96eea645b14a4c09f747b1a47b446a19fa978c0731c84b0a7285e
+AFTER SHA256:  32514671eba96eea645b14a4c09f747b1a47b446a19fa978c0731c84b0a7285e
+PASS: direct repair refused without modifying image
+
+=== DIRECT PREFLIGHT: neg05-duplicate-block ===
+ERROR: block 49 is referenced more than once
+fsck: 1 error(s) found
+EXIT: 1
+BEFORE SHA256: 3da0aff5f0d3f8598cc22fb9d8d3a0e44099fae13716e0777fde7af4d399a8a6
+AFTER SHA256:  3da0aff5f0d3f8598cc22fb9d8d3a0e44099fae13716e0777fde7af4d399a8a6
+PASS: direct repair refused without modifying image
+
+=== DIRECT PREFLIGHT: neg06-four-orphans ===
+ERROR: refusing to recover 4 orphans at once
+fsck: 1 error(s) found
+EXIT: 1
+BEFORE SHA256: 5825175fe350c2676ce0a3b1da1da57cd94f5b7f4a20a2340a3bd17a2ed0c8b7
+AFTER SHA256:  5825175fe350c2676ce0a3b1da1da57cd94f5b7f4a20a2340a3bd17a2ed0c8b7
+PASS: direct repair refused without modifying image
+
+=== DIRECT PREFLIGHT: neg08-invalid-block ===
+ERROR: inode 5 references invalid block 2010
+fsck: 1 error(s) found
+EXIT: 1
+BEFORE SHA256: dfc5da6fd887fa0bee6df7f0ec40d0016f65982af91ea9ffb383ff7834fe68ff
+AFTER SHA256:  dfc5da6fd887fa0bee6df7f0ec40d0016f65982af91ea9ffb383ff7834fe68ff
+PASS: direct repair refused without modifying image
+
+=== PREFLIGHT SUMMARY ===
+PASS: 6/6
+FAIL: 0/6
